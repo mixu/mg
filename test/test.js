@@ -1,6 +1,7 @@
 var assert = require('assert'),
     mmm = require('mmm'),
-    Model = require('./lib/model.js');
+    Model = require('./lib/model.js'),
+    util = require('util');
 
 var Post;
 
@@ -17,13 +18,32 @@ exports['given a simple model'] = {
           author: 1000
         }));
       }
+      if(uri == 'http://localhost/posts/2') {
+        callback(undefined, new Model({
+          id: 1,
+          name: 'Foo',
+          author: 1000,
+          comments: [ 1, 2 ]
+        }));
+      }
       if(uri == 'http://localhost/people/1000') {
         return callback(undefined, new Model({
           id: 1000,
           name: 'Bar'
         }));
       }
-
+      if(uri == 'http://localhost/comments/1') {
+        return callback(undefined, new Model({
+          id: 1,
+          name: 'C-1'
+        }));
+      }
+      if(uri == 'http://localhost/comments/2') {
+        return callback(undefined, new Model({
+          id: 2,
+          name: 'C-2'
+        }));
+      }
     };
 
     mmm.define('Post', Model, {
@@ -31,12 +51,17 @@ exports['given a simple model'] = {
       rels: {
         'author': {
           href: 'http://localhost/people/{author}',
-          type: 'People'
+          type: 'Person'
+        },
+        'comments': {
+          href: 'http://localhost/comments/{comments}',
+          type: 'Comment'
         }
       }
      });
 
-    mmm.define('People', Model, { href: 'http://localhost/people/{id}' });
+    mmm.define('Person', Model, { href: 'http://localhost/people/{id}' });
+    mmm.define('Comment', Model, { href: 'http://localhost/comments/{id}' });
 
     Post = {
       find: function(search, onDone) {
@@ -64,15 +89,21 @@ exports['given a simple model'] = {
 
   'can hydrate a one-one relationship': function(done) {
     Post.find(1, function(err, val) {
-      console.log(val);
+      console.log(util.inspect(val, false, 10, true));
+      // check that the model id is correct
       assert.equal(val.get('id'), 1);
+      // and the model contains a child model, author
       assert.equal(val.get('author').get('name'), 'Bar');
       done();
     });
   },
 
   'can hydrate a one-many relationship to a collection': function(done) {
-    done();
+    // Post (id = 2) has many comments
+    Post.find(2, function(err, val) {
+      console.log(util.inspect(val, false, 10, true));
+      done();
+    });
   },
 
   'will wait properly for a pending request to complete rather than launching multiple requests': function(done) {

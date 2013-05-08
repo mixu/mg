@@ -37,44 +37,74 @@ function get(name, id, callback) {
   });
 }
 
+function runner(callbacks, last) {
+  var results = [];
+  var result_count = 0;
+  callbacks.forEach(function(callback, index) {
+    callback( function(result) {
+      results[index] = result;
+      result_count++;
+      if(result_count == callbacks.length) {
+        last(results);
+      }
+    });
+  });
+}
+
 // given a fetched object, populate any refs to foreign models in it
 // and call the callback
 function hydrate(name, obj, callback) {
-  var tasks = [];
-  // if there is no hydratable relations, then just do the callback
+    // if there is no hydratable relations, then just call the callback
   if(!defs[name] || !defs[name].rels) {
     return callback(undefined, obj);
   }
-  // else
+  var tasks = [],
+      waiting = 0;
+  // for each hydration task, there is an array of relation keys to fill in
   Object.keys(defs[name].rels).forEach(function(key) {
     // is a value set that needs to be hydrated?
-    var id = obj.get(key),
+    var ids = obj.get(key),
         modelName = defs[name].rels[key].type,
-        value;
-    if(!isNaN(id)) {
-      // can we fetch the value to hydrate locally? if so, we're done with this
-      value = local(modelName, key);
-      if(value) {
-        obj.set(key, value);
+        subtasks = [];
+
+    (Array.isArray(ids) ? ids : [ ids ]).forEach(function(id) {
+      // acceptable values are numbers, strings and arrays of numbers and strings
+      if(typeof id != 'number' && typeof id != 'string') {
         return;
       }
       // else queue up the task to fetch the related model
-      tasks.push(function(done) {
+      subtasks.push(function(done) {
+        // can we fetch the value to hydrate locally? if so, we're done with this
+        var value = local(modelName, id);
+        if(value) {
+          return done(value);
+        }
         get(modelName, id, function(err, result) {
-          obj.set(key, result);
-          done();
+          done(result);
         })
       });
+    });
+    if(subtasks.length > 0) {
+      // only store the tasks array if it contains something
+      tasks[key] = subtasks;
+      waiting++;
     }
   });
-  //wait until all the pending operations have completed and then return the callback
-  function runner() {
-    if(tasks.length == 0) {
-      return callback(undefined, obj);
-    }
-    (tasks.shift()(runner));
+
+  if(waiting == 0) {
+    return callback(undefined, obj);
   }
-  runner();
+
+  // for each subtasks array, run a runner
+  Object.keys(tasks).forEach(function(key) {
+    runner(tasks[key], function(results) {
+      obj.set(key, (results.length == 1 ? results[0] : results));
+      waiting--;
+      if(waiting == 0) {
+        callback(undefined, obj);
+      }
+    });
+  });
 }
 
 // find a model by criteria
