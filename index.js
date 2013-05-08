@@ -67,18 +67,14 @@ function hydrate(name, obj, callback) {
       });
     }
   });
-  // if no tasks were queued up, run the callback immediately
-  if(tasks.length == 0) {
-    return callback(undefined, obj);
-  }
-  // else wait until all the pending operations have completed and then return the callback
+  //wait until all the pending operations have completed and then return the callback
   function runner() {
     if(tasks.length == 0) {
       return callback(undefined, obj);
     }
     (tasks.shift()(runner));
   }
-  (tasks.shift()(runner));
+  runner();
 }
 
 // find a model by criteria

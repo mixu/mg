@@ -62,14 +62,51 @@ exports['given a simple model'] = {
     });
   },
 
-  'can get one related model': function(done) {
+  'can hydrate a one-one relationship': function(done) {
     Post.find(1, function(err, val) {
       console.log(val);
       assert.equal(val.get('id'), 1);
       assert.equal(val.get('author').get('name'), 'Bar');
       done();
     });
+  },
+
+  'can hydrate a one-many relationship to a collection': function(done) {
+    done();
+  },
+
+  'will wait properly for a pending request to complete rather than launching multiple requests': function(done) {
+    done();
+  },
+
+  'can convert a new plain model to a JSON POST': function() {
+
+  },
+
+  'can convert a plain model attribute change to a JSON PATCH': function() {
+
+  },
+
+  'can convert a new one-one relationship to a JSON PATCH': function() {
+
+  },
+
+  'can convert a removal of a one-one relationship to a JSON PATCH': function() {
+
+  },
+
+  'can convert a new one-many relationship to a JSON PATCH': function() {
+
+  },
+
+  'can convert a removal of a one-many relationship to a JSON PATCH': function() {
+
+  },
+
+  'can initialize the cache from a JSON-API structure': function(done) {
+    done();
   }
+
 };
 
 // if this module is the script being run, then run the tests:
