@@ -8,21 +8,22 @@ exports['given a simple model'] = {
 
   before: function() {
 
-    mmm.fetch = function(uri) {
+    mmm.fetch = function(uri, callback) {
       console.log('fetch', uri);
       if(uri == 'http://localhost/posts/1') {
-        return {
+        callback(undefined, new Model({
           id: 1,
           name: 'Foo',
           author: 1000
-        }
+        }));
       }
       if(uri == 'http://localhost/people/1000') {
-        return {
+        return callback(undefined, new Model({
           id: 1000,
           name: 'Bar'
-        };
+        }));
       }
+
     };
 
     mmm.define('Post', Model, {
@@ -37,19 +38,24 @@ exports['given a simple model'] = {
 
     mmm.define('People', Model, { href: 'http://localhost/people/{id}' });
 
-    Post = mmm.get('Post');
+    Post = {
+      find: function(search, onDone) {
+        return mmm.find('Post', search, onDone);
+      }
+    };
   },
 
   'can find by id': function(done) {
-    Post.find(1, function(val) {
+    Post.find(1, function(err, val) {
       assert.equal(val.get('id'), 1);
       done();
     });
   },
 
   'multiple find calls return same instance': function(done) {
-    Post.find(1, function(val) {
-      Post.find(1, function(val2) {
+    Post.find(1, function(err, val) {
+      Post.find(1, function(err, val2) {
+        assert.equal(val.get('id'), 1);
         assert.strictEqual(val, val2);
         done();
       });
@@ -57,8 +63,10 @@ exports['given a simple model'] = {
   },
 
   'can get one related model': function(done) {
-    Post.find(1, function(val) {
+    Post.find(1, function(err, val) {
       console.log(val);
+      assert.equal(val.get('id'), 1);
+      assert.equal(val.get('author').get('name'), 'Bar');
       done();
     });
   }
