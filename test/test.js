@@ -89,7 +89,7 @@ exports['given a simple model'] = {
 
   'can hydrate a one-one relationship': function(done) {
     Post.find(1, function(err, val) {
-      console.log(util.inspect(val, false, 10, true));
+//      console.log(util.inspect(val, false, 10, true));
       // check that the model id is correct
       assert.equal(val.get('id'), 1);
       // and the model contains a child model, author
@@ -98,10 +98,13 @@ exports['given a simple model'] = {
     });
   },
 
-  'can hydrate a one-many relationship to a collection': function(done) {
+  'can hydrate a one-many relationship to a array': function(done) {
     // Post (id = 2) has many comments
     Post.find(2, function(err, val) {
-      console.log(util.inspect(val, false, 10, true));
+      assert.equal(val.get('id'), 1);
+      assert.equal(val.get('comments')[0].get('name'), 'C-1');
+      assert.equal(val.get('comments')[1].get('name'), 'C-2');
+//      console.log(util.inspect(val, false, 10, true));
       done();
     });
   },
@@ -111,27 +114,84 @@ exports['given a simple model'] = {
   },
 
   'can convert a new plain model to a JSON POST': function() {
+    // Backbone sync call convention:
+    // .sync('create', model, { success: cb, error: cb })
+    // .sync('update', model, { success: cb, error: cb })
+    // .sync('patch', model, { success: cb, error: cb })
+    //
+    // Url is either in model.url or passed in as options.url
+
+    // Expect:
+    // POST /posts
+    // Content-Type: application/json
+    // Accept: application/json
+    // { posts: [{ ... }] }
+
 
   },
 
   'can convert a plain model attribute change to a JSON PATCH': function() {
 
+    // Expect:
+    // PATCH /photos/1
+    // Content-Type: application/json-patch+json
+    //
+    // [
+    //  { "op": "replace", "path": "/src", "value": "http://example.com/hamster.png" }
+    // ]
+
+
   },
 
   'can convert a new one-one relationship to a JSON PATCH': function() {
+
+    // Expect:
+    /*
+    PATCH /photos/1
+    Content-Type: application/json-patch+json
+    Accept: application/json
+
+    [
+      { "op": "replace", "path": "/links/author", "value": 2 }
+    ]
+    */
 
   },
 
   'can convert a removal of a one-one relationship to a JSON PATCH': function() {
 
+    /*
+    PATCH /photos/1
+    Content-Type: application/json-patch+json
+    Accept: application/json
+
+    [
+      { "op": "remove", "path": "/links/author", "value": 2 }
+    ]
+    */
+
+
   },
 
-  'can convert a new one-many relationship to a JSON PATCH': function() {
+  'can add a new one-many relationship to a JSON PATCH': function() {
+    /*
+    PATCH /photos/1
+
+    [
+      { "op": "add", "path": "/links/comments/-", "value": 30 }
+    ]
+    */
 
   },
 
   'can convert a removal of a one-many relationship to a JSON PATCH': function() {
+    /*
+    PATCH /photos/1
 
+    [
+      { "remove": "links/comments/5" }
+    ]
+    */
   },
 
   'can initialize the cache from a JSON-API structure': function(done) {

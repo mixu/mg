@@ -122,3 +122,16 @@ exports.find = function(name, search, onDone) {
     // search by something else -> needs to be run remotely
   }
 };
+
+var methodMap = {
+  'create': 'POST',
+  'update': 'PUT',
+  'patch':  'PATCH',
+  'delete': 'DELETE',
+  'read':   'GET'
+};
+
+exports.sync = function(op, model, opts) {
+  var params = {type: type, dataType: 'json'};
+
+};
