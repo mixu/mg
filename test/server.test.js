@@ -1,63 +1,13 @@
 var assert = require('assert'),
     mmm = require('mmm'),
-    http = require('http'),
-    Server = require('../server.js');
+    http = require('http');
 
-var server = new Server();
-
-function request(opts, onDone) {
-  opts.hostname = 'localhost';
-  opts.port = 8000;
-  var req = http.request(opts, function(res) {
-      var body = '';
-      res.on('data', function(chunk) {
-        body += chunk;
-      });
-      res.on('end', function() {
-        if(res.headers['content-type'] == 'application/json') {
-          try {
-            onDone(undefined, JSON.parse(body), res);
-            return;
-          } catch(e) {
-            throw e;
-          }
-        }
-        onDone(undefined, body, res);
-      });
-    })
-  if(opts.data) {
-    req.write(opts.data);
-  }
-  req.end();
-}
-
-server.add({
-  posts: [{
-    id: 1,
-    name: 'Foo',
-    author: 1000
-  },
-  {
-    id: 2,
-    name: 'Foo',
-    author: 1000,
-    comments: [ 1, 2 ]
-  }],
-  people: [{
-    id: 1000,
-    name: 'Bar'
-  }],
-  comments: [
-    {
-      id: 1,
-      name: 'C-1'
-    },
-    {
-      id: 2,
-      name: 'C-2'
-    }
-  ]
-});
+var server = require('./lib/test_server.js'),
+    request = require('./lib/request.js')
+              .defaults({
+                hostname: 'localhost',
+                port: 8000
+               });
 
 exports['reading items'] = {
 

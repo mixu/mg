@@ -1,3 +1,6 @@
+var url = require('url'),
+    request = require('./test/lib/request.js');
+
 var defs = {};
 
 // Define a correspondence between a name and a Model class (and metadata)
@@ -7,8 +10,21 @@ exports.define = function(name, Model, mmeta) {
   defs[name].cache = {};
 };
 
-exports.fetch = function(uri, callback) {
+exports.fetch = function(name, uri, callback) {
   // only fetch if we're not already waiting for this resource
+  // parse out the path
+  var parts = url.parse(uri);
+  return request({ hostname: parts.hostname, path: parts.pathname, port: parts.port }, function(err, data, res) {
+    // expect { modelName: [ { .. model .. }, .. ]}
+    var key = defs[name].plural;
+    if(data[key].length == 1) {
+      return callback(err, new defs[name].Model(data[key][0]));
+    } else {
+      return callback(err, data[key].map(function(item) {
+        return new defs[name].Model(item);
+      }));
+    }
+  });
 };
 
 function replace(str, lookup) {
@@ -30,7 +46,7 @@ function get(name, id, callback) {
   }
   // do remote fetch if not locally available
   if(!defs[name]) throw new Error(name + ' is not defined');
-  exports.fetch(replace(defs[name].href, { id: id }), function(err, result) {
+  exports.fetch(name, replace(defs[name].href, { id: id }), function(err, result) {
     if(err) callback(err);
     defs[name].cache[id] = result;
     return callback(err, result);
