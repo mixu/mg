@@ -22,6 +22,23 @@ CollectionServer.prototype.add = function(items) {
   });
 };
 
+CollectionServer.prototype.findById = function(collection, ids, onDone) {
+  var self = this,
+      results = [];
+  ids.filter(function(id) {
+      return !isNaN(id);
+    }).forEach(function(id) {
+      self.cache[collection].some(function(model) {
+        if(model.id == id) {
+          results.push(model);
+          return true;
+        }
+        return false;
+      });
+    });
+  onDone(undefined, results);
+};
+
 CollectionServer.prototype.onRequest = function(req, res) {
   var self = this,
       parsed = url.parse(req.url, true),
@@ -29,7 +46,6 @@ CollectionServer.prototype.onRequest = function(req, res) {
         return item.length > 0;
       }),
       collection = parts[0],
-      results = [],
       result = {};
 
   // console.log('path', parts);
@@ -43,46 +59,94 @@ CollectionServer.prototype.onRequest = function(req, res) {
     if(parsed.query.ids) {
       targets = targets.concat(parsed.query.ids.split(','));
     }
-
-    targets.filter(function(id) {
-      return !isNaN(id);
-    }).forEach(function(id) {
-      self.cache[collection].some(function(model) {
-        if(model.id == id) {
-          results.push(model);
-          return true;
-        }
-        return false;
-      });
+    this.findById(collection, targets, function(err, results) {
+      if(results.length > 0) {
+        result[collection] = results;
+        res.setHeader('Content-Type', 'application/json');
+        res.end(JSON.stringify(result));
+        return;
+      }
     });
-    if(results.length > 0) {
-      result[collection] = results;
-      res.setHeader('Content-Type', 'application/json');
-      res.end(JSON.stringify(result));
-      return;
-    }
     res.end();
-  } else if(req.method == 'POST') {
+  } else if(req.method == 'POST' || req.method == 'PATCH' || req.method == 'DELETE') {
     // parse the body
     var body = '';
     req.on('data', function(chunk) {
       body += chunk;
     });
     req.on('end', function() {
-      body = JSON.parse(body);
-      // assign id
-      body.id = ++self.nextId[collection];
-      self.cache[collection].push(body);
-      // MUST respond with a 201 Created
-      res.statusCode = 201;
-      // MUST include a Location
-      res.setHeader('Location', 'http://localhost:8000/');
-      res.setHeader('Content-Type', 'application/json');
-      result[collection] = [ body ];
-      res.end(JSON.stringify(result));
-    });
-  } else if(req.method == 'PATCH') {
+      if(body.length > 0) {
+        body = JSON.parse(body);
+      }
 
+      // create
+      if(req.method == 'POST') {
+        // assign id
+        body.id = ++self.nextId[collection];
+        self.cache[collection].push(body);
+        // MUST respond with a 201 Created
+        res.statusCode = 201;
+        // MUST include a Location
+        res.setHeader('Location', 'http://localhost:8000/');
+        res.setHeader('Content-Type', 'application/json');
+        result[collection] = [ body ];
+        res.end(JSON.stringify(result));
+      } else if(req.method == 'PATCH' && Array.isArray(body)) {
+        // fetch the item
+        self.findById(collection, [ parts[1] ], function(err, results) {
+          // interpret the operation
+          body.forEach(function(op) {
+            var path = op.path.split('/').filter(function(item) { return item.length > 0; });
+
+            switch(op.op) {
+              case 'replace':
+                // is it on /links?
+
+                // 204 No content if the update was successful and the client's current attributes remain up to date
+                res.statusCode = 204;
+                results[0][path[0]] = op.value;
+                console.log('replace', op.path.slice(1), '=', op.value);
+                break;
+              case 'add':
+                // is it on /links?
+                if(path[0] == 'links') {
+                  results[0][path[1]].push(op.value);
+                  console.log('added', op.value, results[0][path[1]]);
+                }
+                break;
+              case 'remove':
+                // is it on /links?
+                if(path[0] == 'links') {
+                  var value = op.value || path[path.length - 1];
+                  results[0][path[1]] = results[0][path[1]].filter(function(v) { return v != value; });
+                  console.log('removed', value, results[0][path[1]]);
+                }
+                break;
+              // not implemented:
+              case 'test':
+              case 'move':
+              case 'copy':
+              default:
+            }
+          });
+          res.statusCode = 204;
+          res.end();
+        });
+      } else if(req.method == 'DELETE') {
+        var id =  parts[1];
+        self.cache[collection].filter(function(model) {
+          if(model.id == id) {
+            console.log('delete', model);
+            return false;
+          }
+          return true;
+        });
+        res.statusCode = 204;
+        res.end();
+      } else {
+        res.end();
+      }
+    });
   } else {
     res.end();
   }

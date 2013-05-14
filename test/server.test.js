@@ -32,6 +32,17 @@ function request(opts, onDone) {
 }
 
 server.add({
+  posts: [{
+    id: 1,
+    name: 'Foo',
+    author: 1000
+  },
+  {
+    id: 2,
+    name: 'Foo',
+    author: 1000,
+    comments: [ 1, 2 ]
+  }],
   people: [{
     id: 1000,
     name: 'Bar'
@@ -127,7 +138,7 @@ exports['creating, updating, deleting'] = {
     });
   },
 
-  'can update a item via PATCH /comments': function(done) {
+  'can update a item via PATCH+replace /comments': function(done) {
     request({
       path: '/comments/3',
       method: 'PATCH',
@@ -135,20 +146,54 @@ exports['creating, updating, deleting'] = {
         { op: 'replace', path: '/name', value: 'updated comment' }
       ])
     }, function(err, data, res) {
-      console.log(data);
+      // Respond 204 No content if the update was successful
+      assert.equal(res.statusCode, 204);
+      assert.equal(data, '');
+      done();
+    });
+  },
 
-      // MUST respond with a 201 Created
-      assert.equal(res.statusCode, 201);
-      // MUST include a Location
-      assert.ok(res.headers['location']);
+  'can associate a item via PATCH+add /posts': function(done) {
+    request({
+      path: '/posts/2',
+      method: 'PATCH',
+      data: JSON.stringify([
+        { op: 'add', path: '/links/comments/-', value: 3 }
+      ])
+    }, function(err, data, res) {
+      // Respond 204 No content if the update was successful
+      assert.equal(res.statusCode, 204);
+      assert.equal(data, '');
+      done();
+    });
+  },
 
-      assert.ok(data.comments);
-      assert.ok(Array.isArray(data.comments));
-      assert.ok(data.comments.length, 1);
-      assert.equal(data.comments[0].name, 'new comment');
+  'can remove an association via PATCH+remove /posts': function(done) {
+    request({
+      path: '/posts/2',
+      method: 'PATCH',
+      data: JSON.stringify([
+        { op: 'remove', path: '/links/comments/3' }
+      ])
+    }, function(err, data, res) {
+      // Respond 204 No content if the update was successful
+      assert.equal(res.statusCode, 204);
+      assert.equal(data, '');
       done();
     });
 
+  },
+
+  'can delete a item via DELETE /posts/id': function(done) {
+    request({
+      path: '/posts/1',
+      method: 'DELETE'
+    }, function(err, data, res) {
+      // Respond 204 No content
+      assert.equal(res.statusCode, 204);
+      assert.equal(data, '');
+      done();
+    });
   }
 };
 
