@@ -2,6 +2,7 @@ var url = require('url');
 
 function CollectionServer() {
  this.cache = {};
+ this.nextId = {};
 }
 
 // items should be in the form { collectionName: [ { data 1 }, { data 2} ]  }
@@ -12,6 +13,12 @@ CollectionServer.prototype.add = function(items) {
       throw new Error('Collections must be arrays');
     }
     self.cache[key] = items[key];
+  });
+  // calculate max(id) for each collection
+  Object.keys(this.cache).forEach(function(key) {
+    self.nextId[key] = self.cache[key].reduce(function(prev, model) {
+      return Math.max(prev, model.id);
+    }, 0);
   });
 };
 
@@ -54,8 +61,31 @@ CollectionServer.prototype.onRequest = function(req, res) {
       res.end(JSON.stringify(result));
       return;
     }
+    res.end();
+  } else if(req.method == 'POST') {
+    // parse the body
+    var body = '';
+    req.on('data', function(chunk) {
+      body += chunk;
+    });
+    req.on('end', function() {
+      body = JSON.parse(body);
+      // assign id
+      body.id = ++self.nextId[collection];
+      self.cache[collection].push(body);
+      // MUST respond with a 201 Created
+      res.statusCode = 201;
+      // MUST include a Location
+      res.setHeader('Location', 'http://localhost:8000/');
+      res.setHeader('Content-Type', 'application/json');
+      result[collection] = [ body ];
+      res.end(JSON.stringify(result));
+    });
+  } else if(req.method == 'PATCH') {
+
+  } else {
+    res.end();
   }
-  res.end();
 };
 
 module.exports = CollectionServer;

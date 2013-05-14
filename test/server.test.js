@@ -8,7 +8,7 @@ var server = new Server();
 function request(opts, onDone) {
   opts.hostname = 'localhost';
   opts.port = 8000;
-  http.request(opts, function(res) {
+  var req = http.request(opts, function(res) {
       var body = '';
       res.on('data', function(chunk) {
         body += chunk;
@@ -16,15 +16,19 @@ function request(opts, onDone) {
       res.on('end', function() {
         if(res.headers['content-type'] == 'application/json') {
           try {
-            onDone(undefined, JSON.parse(body));
+            onDone(undefined, JSON.parse(body), res);
             return;
           } catch(e) {
             throw e;
           }
         }
-        onDone(undefined, body);
+        onDone(undefined, body, res);
       });
-    }).end();
+    })
+  if(opts.data) {
+    req.write(opts.data);
+  }
+  req.end();
 }
 
 server.add({
@@ -99,6 +103,55 @@ exports['reading items'] = {
     });
   }
 };
+
+exports['creating, updating, deleting'] = {
+
+  'can create a new item via POST /comments': function(done) {
+    request({
+      path: '/comments',
+      method: 'POST',
+      data: JSON.stringify({ name: 'new comment' })
+    }, function(err, data, res) {
+      console.log(data);
+
+      // MUST respond with a 201 Created
+      assert.equal(res.statusCode, 201);
+      // MUST include a Location
+      assert.ok(res.headers['location']);
+
+      assert.ok(data.comments);
+      assert.ok(Array.isArray(data.comments));
+      assert.ok(data.comments.length, 1);
+      assert.equal(data.comments[0].name, 'new comment');
+      done();
+    });
+  },
+
+  'can update a item via PATCH /comments': function(done) {
+    request({
+      path: '/comments/3',
+      method: 'PATCH',
+      data: JSON.stringify([
+        { op: 'replace', path: '/name', value: 'updated comment' }
+      ])
+    }, function(err, data, res) {
+      console.log(data);
+
+      // MUST respond with a 201 Created
+      assert.equal(res.statusCode, 201);
+      // MUST include a Location
+      assert.ok(res.headers['location']);
+
+      assert.ok(data.comments);
+      assert.ok(Array.isArray(data.comments));
+      assert.ok(data.comments.length, 1);
+      assert.equal(data.comments[0].name, 'new comment');
+      done();
+    });
+
+  }
+};
+
 
 
 // if this module is the script being run, then run the tests:
