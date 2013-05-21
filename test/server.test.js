@@ -12,9 +12,13 @@ var server = require('./lib/test_server.js'),
 exports['reading items'] = {
 
   before: function(done) {
-    http.createServer(function(req, res) {
+    this.server = http.createServer(function(req, res) {
       server.onRequest(req, res);
     }).listen(8000).on('listening', done);
+  },
+
+  after: function(done) {
+    this.server.once('close', done).close();
   },
 
   'can read /item/:id': function(done) {
@@ -66,6 +70,16 @@ exports['reading items'] = {
 };
 
 exports['creating, updating, deleting'] = {
+
+  before: function(done) {
+    this.server = http.createServer(function(req, res) {
+      server.onRequest(req, res);
+    }).listen(8000).on('listening', done);
+  },
+
+  after: function(done) {
+    this.server.once('close', done).close();
+  },
 
   'can create a new item via POST /comments': function(done) {
     request({

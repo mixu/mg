@@ -10,7 +10,7 @@ var Post;
 exports['given a simple model'] = {
 
   before: function(done) {
-    http.createServer(function(req, res) {
+    this.server = http.createServer(function(req, res) {
       server.onRequest(req, res);
     }).listen(8000).on('listening', done);
 
@@ -42,23 +42,27 @@ exports['given a simple model'] = {
     });
 
     Post = {
-      find: function(search, onDone) {
-        return mmm.find('Post', search, onDone);
+      findById: function(id, onDone) {
+        return mmm.findById('Post', id, onDone);
       }
     };
   },
 
+  after: function(done) {
+    this.server.once('close', done).close();
+  },
+
   'can find by id': function(done) {
-    Post.find(1, function(err, val) {
-      console.log(val);
+    Post.findById(1, function(err, val) {
+      // console.log(val);
       assert.equal(val.get('id'), 1);
       done();
     });
   },
 
   'multiple find calls return same instance': function(done) {
-    Post.find(1, function(err, val) {
-      Post.find(1, function(err, val2) {
+    Post.findById(1, function(err, val) {
+      Post.findById(1, function(err, val2) {
         assert.equal(val.get('id'), 1);
         assert.strictEqual(val, val2);
         done();
@@ -67,7 +71,7 @@ exports['given a simple model'] = {
   },
 
   'can hydrate a one-one relationship': function(done) {
-    Post.find(1, function(err, val) {
+    Post.findById(1, function(err, val) {
 //      console.log(util.inspect(val, false, 10, true));
       // check that the model id is correct
       assert.equal(val.get('id'), 1);
@@ -79,7 +83,7 @@ exports['given a simple model'] = {
 
   'can hydrate a one-many relationship to a array': function(done) {
     // Post (id = 2) has many comments
-    Post.find(2, function(err, val) {
+    Post.findById(2, function(err, val) {
       assert.equal(val.get('id'), 2);
       assert.equal(val.get('comments')[0].get('name'), 'C-1');
       assert.equal(val.get('comments')[1].get('name'), 'C-2');

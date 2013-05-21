@@ -11,12 +11,12 @@ exports['given two subscriptions to a model by id'] = {
 
   before: function(done) {
     var self = this;
-    http.createServer(function(req, res) {
+    this.server = http.createServer(function(req, res) {
       server.onRequest(req, res);
     }).listen(8000).on('listening', function() {
 
       // create direct subscription
-      Post.find(1, function(err, val) {
+      Post.findById(1, function(err, val) {
         if (err) throw err;
         self.model = val;
         // create wildcard subscription on all models of a type
@@ -55,13 +55,17 @@ exports['given two subscriptions to a model by id'] = {
     });
 
     Post = {
-      find: function(search, onDone) {
-        return mmm.find('Post', search, onDone);
+      findById: function(id, onDone) {
+        return mmm.findById('Post', id, onDone);
       },
       allAsCollection: function(onDone) {
         return mmm.allAsCollection('Post');
       }
     };
+  },
+
+  after: function(done) {
+    this.server.once('close', done).close();
   },
 
   'direct subscription can get notified of an update': function(done) {
@@ -71,7 +75,7 @@ exports['given two subscriptions to a model by id'] = {
       done();
     });
 
-    Post.find(1, function(err, val) {
+    Post.findById(1, function(err, val) {
       val.set('name', 'Foo');
     });
   }
