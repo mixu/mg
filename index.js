@@ -1,57 +1,7 @@
-var url = require('url'),
-    request = require('./test/lib/request.js');
-
-var defs = {};
+var cache = require('./lib/cache.js');
 
 // Define a correspondence between a name and a Model class (and metadata)
-exports.define = function(name, Model, mmeta) {
-  defs[name] = mmeta || {};
-  defs[name].Model = Model;
-  defs[name].cache = {};
-};
-
-exports.fetch = function(name, uri, callback) {
-  // only fetch if we're not already waiting for this resource
-  // parse out the path
-  var parts = url.parse(uri);
-  return request({ hostname: parts.hostname, path: parts.pathname, port: parts.port }, function(err, data, res) {
-    // expect { modelName: [ { .. model .. }, .. ]}
-    var key = defs[name].plural;
-    if(data[key].length == 1) {
-      return callback(err, new defs[name].Model(data[key][0]));
-    } else {
-      return callback(err, data[key].map(function(item) {
-        return new defs[name].Model(item);
-      }));
-    }
-  });
-};
-
-function replace(str, lookup) {
-  return str.replace(/{([^}]+)}/g, function(_, key) {
-    return (typeof lookup[key] != 'undefined' ? lookup[key] : key);
-  });
-}
-
-// Lookup from cache by id
-function local(name, id) {
-  return (defs && defs[name] && defs[name].cache && defs[name].cache[id] ? defs[name].cache[id] : false);
-}
-
-// Fetch from remote or cache
-function get(name, id, callback) {
-  var item = local(name, id);
-  if(item) {
-    return callback(undefined, item);
-  }
-  // do remote fetch if not locally available
-  if(!defs[name]) throw new Error(name + ' is not defined');
-  exports.fetch(name, replace(defs[name].href, { id: id }), function(err, result) {
-    if(err) callback(err);
-    defs[name].cache[id] = result;
-    return callback(err, result);
-  });
-}
+exports.define = cache.define;
 
 function runner(callbacks, last) {
   var results = [];
@@ -71,16 +21,17 @@ function runner(callbacks, last) {
 // and call the callback
 function hydrate(name, obj, callback) {
     // if there is no hydratable relations, then just call the callback
-  if(!defs[name] || !defs[name].rels) {
+  if(!cache.meta(name, 'rels')) {
     return callback(undefined, obj);
   }
   var tasks = [],
-      waiting = 0;
+      waiting = 0,
+      rels = cache.meta(name, 'rels');
   // for each hydration task, there is an array of relation keys to fill in
-  Object.keys(defs[name].rels).forEach(function(key) {
+  Object.keys(rels).forEach(function(key) {
     // is a value set that needs to be hydrated?
     var ids = obj.get(key),
-        modelName = defs[name].rels[key].type,
+        modelName = rels[key].type,
         subtasks = [];
 
     (Array.isArray(ids) ? ids : [ ids ]).forEach(function(id) {
@@ -91,11 +42,11 @@ function hydrate(name, obj, callback) {
       // else queue up the task to fetch the related model
       subtasks.push(function(done) {
         // can we fetch the value to hydrate locally? if so, we're done with this
-        var value = local(modelName, id);
+        var value = cache.local(modelName, id);
         if(value) {
           return done(value);
         }
-        get(modelName, id, function(err, result) {
+        cache.get(modelName, id, function(err, result) {
           done(result);
         })
       });
@@ -127,16 +78,22 @@ function hydrate(name, obj, callback) {
 exports.find = function(name, search, onDone) {
   if(typeof search == 'number') {
     // get by id
-    get(name, search, function(err, result) {
+    cache.get(name, search, function(err, result) {
       if(err) onDone(err);
-      // now, hydrate the object. May result in further fetches.
       if(result) {
+        // now, hydrate the instance. May result in further fetches.
         hydrate(name, result, onDone);
       }
     });
   } else {
     // search by something else -> needs to be run remotely
   }
+};
+
+// Collections
+
+exports.allAsCollection = function(name, onDone) {
+
 };
 
 var methodMap = {

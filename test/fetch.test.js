@@ -14,7 +14,8 @@ exports['given a simple model'] = {
       server.onRequest(req, res);
     }).listen(8000).on('listening', done);
 
-    mmm.define('Post', Model, {
+    mmm.define('Post', {
+      Model: Model,
       href: 'http://localhost:8000/posts/{id}',
       plural: 'posts',
       rels: {
@@ -29,11 +30,13 @@ exports['given a simple model'] = {
       }
      });
 
-    mmm.define('Person', Model, {
+    mmm.define('Person', {
+      Model: Model,
       href: 'http://localhost:8000/people/{id}',
       plural: 'people'
     });
-    mmm.define('Comment', Model, {
+    mmm.define('Comment', {
+      Model: Model,
       href: 'http://localhost:8000/comments/{id}',
       plural: 'comments'
     });
