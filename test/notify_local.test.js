@@ -3,9 +3,9 @@ var assert = require('assert'),
     http = require('http'),
     mmm = require('mmm'),
     server = require('./lib/test_server.js'),
-    Model = require('./lib/model.js');
+    Post = require('./lib/post.js');
 
-var Post;
+require('./lib/dataset.js')(mmm);
 
 exports['given two subscriptions to a model by id'] = {
 
@@ -22,62 +22,57 @@ exports['given two subscriptions to a model by id'] = {
         // create wildcard subscription on all models of a type
         // => collection subscriptions are filtered versions of this
 
-        // self.collection = Post.allAsCollection();
+        self.collection = Post.allCollection();
         done();
       });
     });
-
-    mmm.define('Post', {
-      Model: Model,
-      href: 'http://localhost:8000/posts/{id}',
-      plural: 'posts',
-      rels: {
-        'author': {
-          href: 'http://localhost:8000/people/{author}',
-          type: 'Person'
-        },
-        'comments': {
-          href: 'http://localhost:8000/comments/{comments}',
-          type: 'Comment'
-        }
-      }
-     });
-
-    mmm.define('Person', {
-      Model: Model,
-      href: 'http://localhost:8000/people/{id}',
-      plural: 'people'
-    });
-    mmm.define('Comment', {
-      Model: Model,
-      href: 'http://localhost:8000/comments/{id}',
-      plural: 'comments'
-    });
-
-    Post = {
-      findById: function(id, onDone) {
-        return mmm.findById('Post', id, onDone);
-      },
-      allAsCollection: function(onDone) {
-        return mmm.allAsCollection('Post');
-      }
-    };
   },
 
   after: function(done) {
     this.server.once('close', done).close();
   },
 
-  'direct subscription can get notified of an update': function(done) {
-    var self = this;
-    self.model.once('change:name', function(model, value, options) {
-      console.log('change name to', value);
-      done();
-    });
+  'model': {
 
-    Post.findById(1, function(err, val) {
-      val.set('name', 'Foo');
-    });
+    'can get notified of a change': function(done) {
+      var self = this;
+      self.model.once('change:name', function(model, value, options) {
+        console.log('model change name to', value);
+        done();
+      });
+
+      Post.findById(1, function(err, val) {
+        val.set('name', 'Foo');
+      });
+    }
+  },
+
+  'collection': {
+    // Basics:
+    // "add" (model, collection, options) - when a model is added to a collection.
+    // "remove" (model, collection, options) - when a model is removed from a collection.
+    // "reset" (collection, options) - when the collection's entire contents have been replaced.
+    // "sort" (collection, options) - when the collection has been re-sorted. <= this probably should be an event about order changes
+    // Streams:
+    // - add
+    // - alter
+    // - remove
+
+
+    'can be notified of newly available model after save': function(done) {
+      var self = this;
+      new Post({ name: 'Bar '}).save();
+
+      self.collection.once('add', function(model) {
+        done();
+      });
+    },
+
+    'can be notified of newly deleted model after destroy': function() {
+      Post.findById(1, function(err, val) {
+        val.destroy();
+      });
+    }
   }
 };
 

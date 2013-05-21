@@ -1,5 +1,7 @@
 var cache = require('./lib/cache.js'),
-    hydrate = require('./lib/hydrate.js');
+    hydrate = require('./lib/hydrate.js'),
+    Stream = require('./lib/stream.js'),
+    Collection = require('./test/lib/collection.js');
 
 // Define a correspondence between a name and a Model class (and metadata)
 exports.define = cache.define;
@@ -21,6 +23,15 @@ exports.find = function(name, conditions, onDone) {
       }
     });
   }
+  // this is how we say "get all"
+  if(conditions.since == 0) {
+    // this might involve a remote lookup later on
+    // for now just fetch all local items
+    return onDone(undefined, cache.keys(name).map(function(id) {
+      return cache.local(name, id);
+    }));
+  }
+
   // search by something else -> needs to be run remotely, since we don't have the ability to
   // reason about queries on the client side
 
@@ -40,13 +51,21 @@ exports.findById = function(name, id, onDone) {
 
 // returns a pipeable stream
 exports.stream = function(name, conditions) {
+  var instance = new Collection();
+  // start the find
+  exports.find(name, { since: 0 }, function(err, results) {
+    // add the results to the collection
+    instance.add(results);
 
-};
+    // subscribe to local "on-fetch-or-save" (with filter)
+    // if remote subscription is supported, do that as well
+    Stream.on(name, 'available', function(model) {
+      instance.add(model);
+    });
+  });
 
-// Collections
-
-exports.allAsCollection = function(name, onDone) {
-
+  // return a pipeable object
+  return instance;
 };
 
 var methodMap = {

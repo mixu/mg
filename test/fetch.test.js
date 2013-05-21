@@ -3,9 +3,9 @@ var assert = require('assert'),
     http = require('http'),
     mmm = require('mmm'),
     server = require('./lib/test_server.js'),
-    Model = require('./lib/model.js');
+    Post = require('./lib/post.js');
 
-var Post;
+require('./lib/dataset.js')(mmm);
 
 exports['given a simple model'] = {
 
@@ -13,39 +13,6 @@ exports['given a simple model'] = {
     this.server = http.createServer(function(req, res) {
       server.onRequest(req, res);
     }).listen(8000).on('listening', done);
-
-    mmm.define('Post', {
-      Model: Model,
-      href: 'http://localhost:8000/posts/{id}',
-      plural: 'posts',
-      rels: {
-        'author': {
-          href: 'http://localhost:8000/people/{author}',
-          type: 'Person'
-        },
-        'comments': {
-          href: 'http://localhost:8000/comments/{comments}',
-          type: 'Comment'
-        }
-      }
-     });
-
-    mmm.define('Person', {
-      Model: Model,
-      href: 'http://localhost:8000/people/{id}',
-      plural: 'people'
-    });
-    mmm.define('Comment', {
-      Model: Model,
-      href: 'http://localhost:8000/comments/{id}',
-      plural: 'comments'
-    });
-
-    Post = {
-      findById: function(id, onDone) {
-        return mmm.findById('Post', id, onDone);
-      }
-    };
   },
 
   after: function(done) {
