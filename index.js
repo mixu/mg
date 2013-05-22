@@ -1,7 +1,7 @@
 var cache = require('./lib/cache.js'),
     hydrate = require('./lib/hydrate.js'),
     Stream = require('./lib/stream.js'),
-    Collection = require('./test/lib/collection.js');
+    Collection = require('backbone').Collection;
 
 // Define a correspondence between a name and a Model class (and metadata)
 exports.define = cache.define;
@@ -60,7 +60,8 @@ exports.stream = function(name, conditions) {
     // subscribe to local "on-fetch-or-save" (with filter)
     // if remote subscription is supported, do that as well
     Stream.on(name, 'available', function(model) {
-      instance.add(model);
+      // console.log('stream.available', instance, model);
+      instance.add([ model ]);
     });
   });
 
@@ -68,15 +69,20 @@ exports.stream = function(name, conditions) {
   return instance;
 };
 
-var methodMap = {
-  'create': 'POST',
-  'update': 'PUT',
-  'patch':  'PATCH',
-  'delete': 'DELETE',
-  'read':   'GET'
-};
-
 exports.sync = function(op, model, opts) {
-  var params = {type: type, dataType: 'json'};
+//  console.log('mmm sync', op, model, opts, model.type);
 
+  // to hook up to the stream, bind on "create"
+  if(op == 'create') {
+    model.once('sync', function() {
+      // console.log('Model.sync', model);
+      Stream.onFetch(model.type, model);
+    });
+  }
+  // delete can be tracked after this via the "destroy" event on the model
+
+  var response = JSON.parse(JSON.stringify(model.attributes));
+  response.id = Math.floor(1 + Math.random() * 1000);
+
+  opts.success(response);
 };

@@ -1,11 +1,10 @@
-var Model = require('./model.js'),
+var Backbone = require('backbone'),
     mmm = require('mmm');
 
-function Post(attrs) {
-  Model.call(this, attrs);
-}
-
-Model.mixin(Post);
+var Post = Backbone.Model.extend({
+  sync: mmm.sync,
+  type: 'Post'
+});
 
 // query methods
 

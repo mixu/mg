@@ -34,15 +34,17 @@ exports['given two subscriptions to a model by id'] = {
 
   'model': {
 
-    'can get notified of a change': function(done) {
+    'can get notified of a change on the original instance': function(done) {
       var self = this;
+
       self.model.once('change:name', function(model, value, options) {
         console.log('model change name to', value);
         done();
       });
 
       Post.findById(1, function(err, val) {
-        val.set('name', 'Foo');
+        // note that Backbone only triggers "change" when the new value is different from the old one
+        val.set('name', 'FooBar');
       });
     }
   },
@@ -61,14 +63,21 @@ exports['given two subscriptions to a model by id'] = {
 
     'can be notified of newly available model after save': function(done) {
       var self = this;
-      new Post({ name: 'Bar '}).save();
 
       self.collection.once('add', function(model) {
+        assert.equal(model.get('name'), 'Bar');
         done();
       });
+
+      new Post({ name: 'Bar'}).save();
     },
 
-    'can be notified of newly deleted model after destroy': function() {
+    'can be notified of newly deleted model after destroy': function(done) {
+      this.collection.once('destroy', function(model) {
+        assert.equal(model.get('id'), 1);
+        done();
+      });
+
       Post.findById(1, function(err, val) {
         val.destroy();
       });

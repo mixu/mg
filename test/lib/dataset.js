@@ -1,4 +1,4 @@
-var Model = require('./model.js');
+var Backbone = require('backbone');
 
 module.exports = function(mmm) {
   mmm.define('Post', {
@@ -18,13 +18,13 @@ module.exports = function(mmm) {
    });
 
   mmm.define('Person', {
-    Model: Model,
+    Model: Backbone.Model,
     href: 'http://localhost:8000/people/{id}',
     plural: 'people'
   });
 
   mmm.define('Comment', {
-    Model: Model,
+    Model: Backbone.Model,
     href: 'http://localhost:8000/comments/{id}',
     plural: 'comments'
   });
