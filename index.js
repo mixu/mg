@@ -1,7 +1,8 @@
 var cache = require('./lib/cache.js'),
     hydrate = require('./lib/hydrate.js'),
     Stream = require('./lib/stream.js'),
-    Collection = require('backbone').Collection;
+    Collection = require('backbone').Collection,
+    Backbone = require('backbone');
 
 // Define a correspondence between a name and a Model class (and metadata)
 exports.define = cache.define;
@@ -60,8 +61,8 @@ exports.stream = function(name, conditions) {
     // subscribe to local "on-fetch-or-save" (with filter)
     // if remote subscription is supported, do that as well
     Stream.on(name, 'available', function(model) {
-      // console.log('stream.available', instance, model);
-      instance.add([ model ]);
+      // console.log('stream.available', model, model.get('name'));
+      instance.add(model);
     });
   });
 
@@ -70,19 +71,39 @@ exports.stream = function(name, conditions) {
 };
 
 exports.sync = function(op, model, opts) {
-//  console.log('mmm sync', op, model, opts, model.type);
+  console.log('mmm sync', op, model, opts, model.type);
 
   // to hook up to the stream, bind on "create"
   if(op == 'create') {
-    model.once('sync', function() {
-      // console.log('Model.sync', model);
+    var oldSuccess = opts.success;
+    opts.success = function() {
+      oldSuccess.apply(opts, arguments);
+      // console.log('post-success', model.type, model, model.get('name'));
       Stream.onFetch(model.type, model);
-    });
+    }
   }
+
   // delete can be tracked after this via the "destroy" event on the model
+
+  return Backbone.sync.apply(this, arguments);
 
   var response = JSON.parse(JSON.stringify(model.attributes));
   response.id = Math.floor(1 + Math.random() * 1000);
 
   opts.success(response);
+};
+
+// basically, just plucks out the right thing from the output
+exports.parse = function(name) {
+  return function(resp, options) {
+    var meta = cache.meta(name);
+    // console.log('mmm parse', name, resp, options);
+    if(meta.plural && resp[meta.plural]) {
+      if(resp[meta.plural].length == 1) {
+        return resp[meta.plural][0];
+      }
+      return resp[meta.plural];
+    }
+    return resp;
+  };
 };

@@ -50,6 +50,21 @@ CollectionServer.prototype.onRequest = function(req, res) {
 
   // console.log('path', parts);
 
+  if (req.headers.origin) {
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+    res.setHeader('Access-Control-Allow-Origin',req.headers.origin);
+  } else {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+  }
+
+  if(req.method == 'OPTIONS') {
+    res.setHeader('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    res.setHeader('Access-Control-Max-Age', '1728000');
+    res.end();
+  }
+
+
   if(req.method == 'GET' && this.cache[collection]) {
     // Reading:
     // - GET /item/:id
