@@ -63,6 +63,10 @@ exports.stream = function(name, conditions) {
     Stream.on(name, 'available', function(model) {
       // console.log('stream.available', model, model.get('name'));
       instance.add(model);
+
+      model.once('destroy', function() {
+        instance.remove(model);
+      });
     });
   });
 
