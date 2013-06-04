@@ -12,10 +12,12 @@ build:
 	./node_modules/gluejs/bin/gluejs \
 		--include ./lib \
 		--include ./index.js \
+		--include ./node_modules/microee \
 		--replace backbone=window.Backbone \
 		--global mmm \
 		--main index.js \
-		--command 'uglifyjs --no-copyright' \
+		--source-url \
+		--nocommand 'uglifyjs --no-copyright' \
 		--out dist/mmm.js
 
 .PHONY: test build

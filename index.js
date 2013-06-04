@@ -2,12 +2,26 @@ var cache = require('./lib/cache.js'),
     hydrate = require('./lib/hydrate.js'),
     Stream = require('./lib/stream.js'),
     Collection = require('backbone').Collection,
-    Backbone = require('backbone');
+    Backbone = require('backbone'),
+    ajax = require('./lib/ajax.js');
 
 // Define a correspondence between a name and a Model class (and metadata)
 exports.define = cache.define;
 
 // Query API
+
+function listLocal(name, onDone) {
+  onDone(undefined, cache.keys(name).map(function(id) {
+    return cache.local(name, id);
+  }));
+}
+
+function listRemote(name, onDone) {
+  console.log('listRemote', name);
+  ajax('/v1/datasources', function(err, data) {
+    return onDone(undefined, cache.unwrap('DataSource', data));
+  });
+}
 
 // return a collection of models based on a set of conditions
 exports.find = function(name, conditions, onDone) {
@@ -26,11 +40,13 @@ exports.find = function(name, conditions, onDone) {
   }
   // this is how we say "get all"
   if(conditions.since == 0) {
+
+    return listRemote(name, onDone);
+
+
     // this might involve a remote lookup later on
     // for now just fetch all local items
-    return onDone(undefined, cache.keys(name).map(function(id) {
-      return cache.local(name, id);
-    }));
+    // return listLocal(name, onDone);
   }
 
   // search by something else -> needs to be run remotely, since we don't have the ability to
@@ -51,8 +67,8 @@ exports.findById = function(name, id, onDone) {
 };
 
 // returns a pipeable stream
-exports.stream = function(name, conditions) {
-  var instance = new Collection();
+exports.stream = function(name, conditions, collectionClass) {
+  var instance = (collectionClass ? new collectionClass() : new Collection());
   // start the find
   exports.find(name, { since: 0 }, function(err, results) {
     // add the results to the collection
