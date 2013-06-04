@@ -8,4 +8,14 @@ test:
 		--bail \
 		$(TESTS)
 
-.PHONY: test
+build:
+	./node_modules/gluejs/bin/gluejs \
+		--include ./lib \
+		--include ./index.js \
+		--replace backbone=window.Backbone \
+		--global mmm \
+		--main index.js \
+		--command 'uglifyjs --no-copyright' \
+		--out dist/mmm.js
+
+.PHONY: test build
