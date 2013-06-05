@@ -64,12 +64,14 @@ exports.findById = function(name, id, onDone) {
 };
 
 // returns a pipeable stream
-exports.stream = function(name, conditions, collectionClass) {
+exports.stream = function(name, conditions, collectionClass, onLoaded) {
   var instance = (collectionClass ? new collectionClass() : new Collection());
   // start the find
   exports.find(name, { since: 0 }, function(err, results) {
     // add the results to the collection
     instance.add(results);
+
+    onLoaded && onLoaded();
 
     // subscribe to local "on-fetch-or-save" (with filter)
     // if remote subscription is supported, do that as well
@@ -87,27 +89,22 @@ exports.stream = function(name, conditions, collectionClass) {
   return instance;
 };
 
-exports.sync = function(op, model, opts) {
-  console.log('mmm sync', op, model, opts, model.type);
+exports.sync = function(name) {
+ return function(op, model, opts) {
+    console.log('mmm sync', op, model, opts, name);
 
-  // to hook up to the stream, bind on "create"
-  if(op == 'create') {
-    var oldSuccess = opts.success;
-    opts.success = function() {
-      oldSuccess.apply(opts, arguments);
-      // console.log('post-success', model.type, model, model.get('name'));
-      Stream.onFetch(model.type, model);
+    // to hook up to the stream, bind on "create"
+    if(op == 'create') {
+      var oldSuccess = opts.success;
+      opts.success = function() {
+        oldSuccess.apply(opts, arguments);
+        // console.log('post-success', name, model, model.get('name'));
+        Stream.onFetch(name, model);
+      }
     }
-  }
-
-  // delete can be tracked after this via the "destroy" event on the model
-
-  return Backbone.sync.apply(this, arguments);
-
-  var response = JSON.parse(JSON.stringify(model.attributes));
-  response.id = Math.floor(1 + Math.random() * 1000);
-
-  opts.success(response);
+    // delete can be tracked after this via the "destroy" event on the model
+    return Backbone.sync.apply(this, arguments);
+  };
 };
 
 // basically, just plucks out the right thing from the output
