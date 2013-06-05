@@ -1,4 +1,5 @@
 var cache = require('./lib/cache.js'),
+    hydrate = require('./lib/hydrate.js'),
     Stream = require('./lib/stream.js'),
     Collection = require('backbone').Collection,
     Backbone = require('backbone'),
@@ -103,6 +104,32 @@ exports.sync = function(name) {
     if(op == 'create') {
       var oldSuccess = opts.success;
       opts.success = function() {
+        // after create,
+        // 1. unwrap (really, is a call to parse)
+        var oldParse = model.parse;
+        // discarding the success callback is not really feasible,
+        // but if you call it with the original parse function,
+        // the same parse logic will be applied to both "created"
+        // and "updated"/"patched" models.
+        // Created models are the only ones where we need to freshly create
+        // new collections since the original models do not have the right properties
+        // and do not go through the normal find/hydrate pipeline
+        model.parse = function(resp, options) {
+          model.parse = oldParse;
+          var rels = cache.meta(name, 'rels');
+          if(!rels || typeof rels != 'object') return resp;
+
+          Object.keys(rels).forEach(function(key) {
+            var current = resp[key];
+            if(!current || !current.add) {
+              resp[key] = new Collection();
+            }
+          });
+
+          // BB calls model.set with this
+          return resp;
+        };
+        // 2. hydrate -- existing model (e.g. inside parse)
         oldSuccess.apply(opts, arguments);
         // console.log('post-success', name, model, model.get('name'));
         Stream.onFetch(name, model);
@@ -117,13 +144,11 @@ exports.sync = function(name) {
 exports.parse = function(name) {
   return function(resp, options) {
     var meta = cache.meta(name);
-    // console.log('mmm parse', name, resp, options);
-    if(meta.plural && resp[meta.plural]) {
-      if(resp[meta.plural].length == 1) {
-        return resp[meta.plural][0];
-      }
-      return resp[meta.plural];
-    }
+    console.log('mmm parse', name, resp, options);
+    console.trace();
+
+    // 3. store in cache
+
     return resp;
   };
 };
