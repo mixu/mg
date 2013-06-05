@@ -17,7 +17,13 @@ function listLocal(name, onDone) {
 
 function listRemote(name, onDone) {
   console.log('listRemote', name);
-  cache.fetch('DataSource', '/v1/datasources', onDone);
+  if(name == 'DataSource') {
+    cache.fetch(name, '/v1/datasources', onDone);
+  } else if(name == 'Project') {
+    cache.fetch(name, '/v1/projects', onDone);
+  } else {
+    console.error('Unknown mmm.stream name');
+  }
 }
 
 // return a collection of models based on a set of conditions
