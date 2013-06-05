@@ -1,5 +1,4 @@
 var cache = require('./lib/cache.js'),
-    hydrate = require('./lib/hydrate.js'),
     Stream = require('./lib/stream.js'),
     Collection = require('backbone').Collection,
     Backbone = require('backbone'),
@@ -18,9 +17,7 @@ function listLocal(name, onDone) {
 
 function listRemote(name, onDone) {
   console.log('listRemote', name);
-  ajax('/v1/datasources', function(err, data) {
-    return onDone(undefined, cache.unwrap('DataSource', data));
-  });
+  cache.fetch('DataSource', '/v1/datasources', onDone);
 }
 
 // return a collection of models based on a set of conditions
@@ -31,10 +28,10 @@ exports.find = function(name, conditions, onDone) {
   if(conditions.id) {
     // get by id
     return cache.get(name, conditions.id, function(err, result) {
-      if(err) onDone(err);
+      if(err) return onDone(err);
       if(result) {
-        // now, hydrate the instance. May result in further fetches.
-        hydrate(name, result, onDone);
+        // cache returns hydrated results
+        onDone(null, result);
       }
     });
   }

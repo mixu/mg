@@ -15,6 +15,7 @@
   },
   "dependencies": {
     "backbone": "~1.0.0",
-    "gluejs": "~0.2.1"
+    "gluejs": "~0.2.1",
+    "microee": "0.0.2"
   }
 }
