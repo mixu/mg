@@ -14,6 +14,7 @@ build:
 		--include ./index.js \
 		--include ./node_modules/microee \
 		--replace backbone=window.Backbone \
+		--replace minilog=window.Minilog \
 		--global mmm \
 		--main index.js \
 		--source-url \

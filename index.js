@@ -98,7 +98,7 @@ exports.stream = function(name, conditions, collectionClass, onLoaded) {
 
 exports.sync = function(name) {
  return function(op, model, opts) {
-    console.log('mmm sync', op, model, opts, name);
+    console.log('sync', op, model, opts, name);
 
     // to hook up to the stream, bind on "create"
     if(op == 'create') {
@@ -144,11 +144,8 @@ exports.sync = function(name) {
 exports.parse = function(name) {
   return function(resp, options) {
     var meta = cache.meta(name);
-    console.log('mmm parse', name, resp, options);
-    console.trace();
-
+    console.log('parse', name, resp._id);
     // 3. store in cache
-
     return resp;
   };
 };
