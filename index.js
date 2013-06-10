@@ -3,7 +3,8 @@ var cache = require('./lib/cache.js'),
     Stream = require('./lib/stream.js'),
     Collection = require('backbone').Collection,
     Backbone = require('backbone'),
-    ajax = require('./lib/ajax.js');
+    ajax = require('./lib/ajax.js'),
+    log = require('minilog')('mmm');
 
 // Define a correspondence between a name and a Model class (and metadata)
 exports.define = cache.define;
@@ -17,11 +18,13 @@ function listLocal(name, onDone) {
 }
 
 function listRemote(name, onDone) {
-  console.log('listRemote', name);
+  log.info('listRemote', name);
   if(name == 'DataSource') {
     cache.fetch(name, '/v1/datasources', onDone);
   } else if(name == 'Project') {
     cache.fetch(name, '/v1/projects', onDone);
+  } else if(name == 'Job') {
+    cache.fetch(name, '/v1/jobs', onDone);
   } else {
     console.error('Unknown mmm.stream name');
   }
@@ -30,7 +33,7 @@ function listRemote(name, onDone) {
 // return a collection of models based on a set of conditions
 exports.find = function(name, conditions, onDone) {
   if(typeof conditions != 'object') {
-    console.log('Warning: find() conditions not an object!');
+    log.warn('Warning: find() conditions not an object!');
   }
   if(conditions.id) {
     // get by id
@@ -98,7 +101,7 @@ exports.stream = function(name, conditions, collectionClass, onLoaded) {
 
 exports.sync = function(name) {
  return function(op, model, opts) {
-    console.log('sync', op, model, opts, name);
+    log.info('sync', op, model, opts, name);
 
     // to hook up to the stream, bind on "create"
     if(op == 'create') {
@@ -144,7 +147,7 @@ exports.sync = function(name) {
 exports.parse = function(name) {
   return function(resp, options) {
     var meta = cache.meta(name);
-    console.log('parse', name, resp._id);
+    log.debug('parse', name, resp._id);
     // 3. store in cache
     return resp;
   };

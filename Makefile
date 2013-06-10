@@ -17,8 +17,10 @@ build:
 		--replace minilog=window.Minilog \
 		--global mmm \
 		--main index.js \
-		--source-url \
-		--nocommand 'uglifyjs --no-copyright' \
 		--out dist/mmm.js
+
+# disabled:
+#		--source-url \
+#		--nocommand 'uglifyjs --no-copyright' \
 
 .PHONY: test build
