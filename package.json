@@ -13,13 +13,13 @@
     "mocha": "~1.9.0",
     "express": "~3.2.4",
     "gluejs": "~0.2.1",
-    "minilog": "0.1.0"
+    "minilog": "~2.x"
   },
   "dependencies": {
     "backbone": "~1.0.0",
     "microee": "0.0.2"
   },
   "peerDependencies": {
-    "minilog": "0.1.0"
+    "minilog": "~2.x"
   }
 }
