@@ -9,6 +9,10 @@
   "repository": "",
   "author": "Mikito Takada <mikito.takada@gmail.com> (http://mixu.net/)",
   "license": "BSD",
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/mixu/mmm.git"
+  },
   "devDependencies": {
     "mocha": "~1.9.0",
     "express": "~3.2.4",

@@ -76,14 +76,16 @@ CollectionServer.prototype.onRequest = function(req, res) {
     }
     this.findById(collection, targets, function(err, results) {
       if(results.length > 0) {
-        result[collection] = results;
         res.setHeader('Content-Type', 'application/json');
-        res.end(JSON.stringify(result));
+        res.end((results.length == 1 ?  JSON.stringify(results[0]) :  JSON.stringify(results)));
+        // JSONAPI:
+        // result[collection] = results;
+        // res.end(JSON.stringify(result));
         return;
       }
     });
     res.end();
-  } else if(req.method == 'POST' || req.method == 'PATCH' || req.method == 'DELETE') {
+  } else if(req.method == 'POST' || req.method == 'PUT' || req.method == 'PATCH' || req.method == 'DELETE') {
     // parse the body
     var body = '';
     req.on('data', function(chunk) {
@@ -104,8 +106,17 @@ CollectionServer.prototype.onRequest = function(req, res) {
         // MUST include a Location
         res.setHeader('Location', 'http://localhost:8000/');
         res.setHeader('Content-Type', 'application/json');
-        result[collection] = [ body ];
-        res.end(JSON.stringify(result));
+
+        res.end(JSON.stringify(body));
+
+        // JSONAPI:
+        // result[collection] = [ body ];
+        // res.end(JSON.stringify(result));
+      } else if(req.method == 'PUT') {
+        console.log('PUT', parts);
+
+        res.statusCode = 200;
+        res.end();
       } else if(req.method == 'PATCH' && Array.isArray(body)) {
         // fetch the item
         self.findById(collection, [ parts[1] ], function(err, results) {

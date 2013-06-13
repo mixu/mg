@@ -23,6 +23,8 @@ function listRemote(name, onDone) {
     cache.fetch(name, '/v1/datasources', onDone);
   } else if(name == 'Project') {
     cache.fetch(name, '/v1/projects', onDone);
+  } else if(name == 'Post') {
+    cache.fetch(name, '/v1/post', onDone);
   } else if(name == 'Job') {
     cache.fetch(name, '/v1/jobs', onDone);
   } else {

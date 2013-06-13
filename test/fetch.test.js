@@ -5,7 +5,9 @@ var assert = require('assert'),
     server = require('./lib/test_server.js'),
     Post = require('./lib/post.js');
 
-require('./lib/dataset.js')(mmm);
+require('minilog').enable();
+
+// require('./lib/dataset.js')(mmm);
 
 exports['given a simple model'] = {
 
@@ -20,16 +22,16 @@ exports['given a simple model'] = {
   },
 
   'can find by id': function(done) {
-    Post.findById(1, function(err, val) {
-      // console.log(val);
+    mmm.findById('Post', 1, function(err, val) {
+      console.log(val);
       assert.equal(val.get('id'), 1);
       done();
     });
   },
 
   'multiple find calls return same instance': function(done) {
-    Post.findById(1, function(err, val) {
-      Post.findById(1, function(err, val2) {
+    mmm.findById('Post',1, function(err, val) {
+      mmm.findById('Post',1, function(err, val2) {
         assert.equal(val.get('id'), 1);
         assert.strictEqual(val, val2);
         done();
@@ -38,7 +40,7 @@ exports['given a simple model'] = {
   },
 
   'can hydrate a one-one relationship': function(done) {
-    Post.findById(1, function(err, val) {
+    mmm.findById('Post',1, function(err, val) {
 //      console.log(util.inspect(val, false, 10, true));
       // check that the model id is correct
       assert.equal(val.get('id'), 1);
@@ -50,10 +52,10 @@ exports['given a simple model'] = {
 
   'can hydrate a one-many relationship to a array': function(done) {
     // Post (id = 2) has many comments
-    Post.findById(2, function(err, val) {
+    mmm.findById('Post',2, function(err, val) {
       assert.equal(val.get('id'), 2);
-      assert.equal(val.get('comments')[0].get('name'), 'C-1');
-      assert.equal(val.get('comments')[1].get('name'), 'C-2');
+      assert.equal(val.get('comments').at(0).get('name'), 'C-1');
+      assert.equal(val.get('comments').at(1).get('name'), 'C-2');
 //      console.log(util.inspect(val, false, 10, true));
       done();
     });
