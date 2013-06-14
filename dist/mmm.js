@@ -5,15 +5,25 @@ require.m[0] = {
 "minilog": { exports: window.Minilog },
 "index.js": function(module, exports, require){
 var cache = require('./lib/cache.js'),
+    meta = require('./lib/meta.js'),
     hydrate = require('./lib/hydrate.js'),
     Stream = require('./lib/stream.js'),
-    Collection = require('backbone').Collection,
     Backbone = require('backbone'),
     ajax = require('./lib/ajax.js'),
     log = require('minilog')('mmm');
 
+if(typeof window == 'undefined') {
+  var najax = require('najax');
+  Backbone.$ = { ajax: function() {
+      var args = Array.prototype.slice.call(arguments);
+      console.log('ajax', args);
+      najax.apply(najax, args);
+    }
+  };
+}
+
 // Define a correspondence between a name and a Model class (and metadata)
-exports.define = cache.define;
+exports.define = meta.define;
 
 // Query API
 
@@ -29,11 +39,25 @@ function listRemote(name, onDone) {
     cache.fetch(name, '/v1/datasources', onDone);
   } else if(name == 'Project') {
     cache.fetch(name, '/v1/projects', onDone);
+  } else if(name == 'Post') {
+    cache.fetch(name, '/v1/post', onDone);
   } else if(name == 'Job') {
     cache.fetch(name, '/v1/jobs', onDone);
   } else {
     console.error('Unknown mmm.stream name');
   }
+}
+
+function listBoth(name, onDone) {
+  listLocal(name, function(err, localItems) {
+    listRemote(name, function(err, remoteItems) {
+      if(remoteItems) {
+        onDone(err, localItems.concat(remoteItems));
+      } else {
+        onDone(err, localItems);
+      }
+    });
+  });
 }
 
 // return a collection of models based on a set of conditions
@@ -53,13 +77,7 @@ exports.find = function(name, conditions, onDone) {
   }
   // this is how we say "get all"
   if(conditions.since == 0) {
-
-    return listRemote(name, onDone);
-
-
-    // this might involve a remote lookup later on
-    // for now just fetch all local items
-    // return listLocal(name, onDone);
+    return listBoth(name, onDone);
   }
 
   // search by something else -> needs to be run remotely, since we don't have the ability to
@@ -80,8 +98,8 @@ exports.findById = function(name, id, onDone) {
 };
 
 // returns a pipeable stream
-exports.stream = function(name, conditions, collectionClass, onLoaded) {
-  var instance = (collectionClass ? new collectionClass() : new Collection());
+exports.stream = function(name, conditions, onLoaded) {
+  var instance = new (meta.collection(name))();
   // start the find
   exports.find(name, { since: 0 }, function(err, results) {
     // add the results to the collection
@@ -89,15 +107,20 @@ exports.stream = function(name, conditions, collectionClass, onLoaded) {
 
     onLoaded && onLoaded();
 
+    Stream.on(name, 'destroy', function(model) {
+        // console.log('MODEL destroy', model);
+        instance.remove(model);
+        // Can't seem to get the model.destroy to trigger the instance.remove event
+        // Not really sure why it doesn't go through to Backbone.
+        // But let's trigger it manually
+        instance.trigger('remove', model, instance, {});
+
+    });
     // subscribe to local "on-fetch-or-save" (with filter)
     // if remote subscription is supported, do that as well
     Stream.on(name, 'available', function(model) {
       // console.log('stream.available', model, model.get('name'));
       instance.add(model);
-
-      model.once('destroy', function() {
-        instance.remove(model);
-      });
     });
   });
 
@@ -107,7 +130,7 @@ exports.stream = function(name, conditions, collectionClass, onLoaded) {
 
 exports.sync = function(name) {
  return function(op, model, opts) {
-    log.info('sync', op, model, opts, name);
+    log.info('sync', op, name+'='+model.get('id'), opts);
 
     // to hook up to the stream, bind on "create"
     if(op == 'create') {
@@ -125,26 +148,29 @@ exports.sync = function(name) {
         // and do not go through the normal find/hydrate pipeline
         model.parse = function(resp, options) {
           model.parse = oldParse;
-          var rels = cache.meta(name, 'rels');
+          var rels = meta.get(name, 'rels');
           if(!rels || typeof rels != 'object') return resp;
 
           Object.keys(rels).forEach(function(key) {
-            var current = resp[key];
+            var current = resp[key],
+                currentType = rels[key].type;
             if(!current || !current.add) {
-              resp[key] = new Collection();
+              resp[key] = new (meta.collection(currentType))();
             }
           });
+
+          // 2. hydrate -- existing model (e.g. inside parse)
+          // console.log('post-success', name, model, model.get('name'));
+          Stream.onFetch(name, model);
 
           // BB calls model.set with this
           return resp;
         };
-        // 2. hydrate -- existing model (e.g. inside parse)
         oldSuccess.apply(opts, arguments);
-        // console.log('post-success', name, model, model.get('name'));
-        Stream.onFetch(name, model);
       }
     }
     // delete can be tracked after this via the "destroy" event on the model
+
     return Backbone.sync.apply(this, arguments);
   };
 };
@@ -152,7 +178,6 @@ exports.sync = function(name) {
 // basically, just plucks out the right thing from the output
 exports.parse = function(name) {
   return function(resp, options) {
-    var meta = cache.meta(name);
     log.debug('parse', name, resp._id);
     // 3. store in cache
     return resp;
@@ -169,6 +194,12 @@ function fetch(uri, callback) {
   // only fetch if we're not already waiting for this resource
   // parse out the path
   var parts = url.parse(uri);
+
+  if(!parts.hostname && !parts.port) {
+    parts.hostname = 'localhost';
+    parts.port = 8000;
+  }
+  console.log(parts);
   return request({ hostname: parts.hostname, path: parts.pathname, port: parts.port }, function(err, data, res) {
     callback(err, data);
   });
@@ -195,47 +226,45 @@ function ajaxFetch(uri, callback) {
 
 module.exports = (typeof window == 'undefined' ? fetch : ajaxFetch);
 },
-"lib/cache.js": function(module, exports, require){
-var Stream = require('./stream.js'),
-    hydrate = require('./hydrate.js'),
-    ajax = require('./ajax.js'),
-    log = require('minilog')('mmm/cache');
+"lib/meta.js": function(module, exports, require){
+var log = require('minilog')('mmm/meta'),
+    Backbone = require('backbone');
 
-var cache = {},
-    meta = {},
+var meta = {},
     model = {};
 
-// return property or evaluate function
-function result(object, property) {
-  if (object == null) return null;
-  var value = object[property];
+// fetch the key value as-is
+exports.get = function(name, key) {
+  if(arguments.length == 1) {
+    // disallowed so that there is more strict control
+    throw new Error('meta.get must be called with two parameters, direct lookup not supported.');
+  }
+  if(meta[name] && meta[name][key]) {
+    return meta[name][key];
+  }
+};
+
+// also evaluate the result if it's a function
+exports.result = function(name, key) {
+  var value = exports.get(name, key);
+  // if a property is a function, evaluate it
   return (typeof value === 'function' ? value.call(object) : value);
-}
+};
 
-function unwrapJSONAPI(meta, Model, data) {
-  // expect { modelName: [ { .. model .. }, .. ]}
-  var key = meta[name].plural;
-  if(data[key].length == 1) {
-    return Stream.onFetch(name, new model[name](data[key][0]));
-  } else {
-    return data[key].map(function(item) {
-      return Stream.onFetch(name, new model[name](item));
-    });
+// get the model class for the given name
+exports.model = function(name) {
+  if(!model[name]) throw new Error(name + ' does not have a definition.');
+  return model[name];
+};
+
+// get the collection class for the given name
+exports.collection = function(name) {
+  var collection = exports.get(name, 'collection');
+  if(!collection) {
+    console.log(name + ' does not have a `.collection` property.');
+    return Backbone.Collection;
   }
-}
-
-function unwrapBackboneAPI(name, data) {
-  if(!Array.isArray(data)) {
-    return Stream.onFetch(name, new model[name](data));
-  } else {
-    return data.map(function(item) {
-      return Stream.onFetch(name, new model[name](item));
-    });
-  }
-}
-
-var unwrap = exports.unwrap = function(name, data) {
-  return unwrapBackboneAPI(name, data);
+  return exports.model(collection);
 };
 
 exports.define = function(name, mmeta) {
@@ -248,23 +277,51 @@ exports.define = function(name, mmeta) {
   }
 
   // meta properties:
-  // .plural
-  // .url
-  // .rels
+  // .plural => used in hydrating results from JSONAPI which uses this
+  // .url => used to determine the endpoint
+  // .rels => hash of relations:
+  //   'keyname': { type: 'Type' }
+  // .collection => name of collection class used (not instance to avoid circular deps)
 
   // Assume we are given a Backbone model. All the interesting properties are on the prototype.
   meta[name] = mmeta.prototype;
   model[name] = mmeta;
-  cache[name] = {};
 };
 
-exports.meta = function(name, key) {
-  if(arguments.length == 1) {
-    return meta[name];
+},
+"lib/cache.js": function(module, exports, require){
+var Stream = require('./stream.js'),
+    hydrate = require('./hydrate.js'),
+    ajax = require('./ajax.js'),
+    meta = require('./meta.js'),
+    log = require('minilog')('mmm/cache');
+
+var cache = {};
+
+function unwrapJSONAPI(name, data) {
+  // expect { modelName: [ { .. model .. }, .. ]}
+  var key = meta.get(name, 'plural');
+  if(data[key].length == 1) {
+    return Stream.onFetch(name, new meta.model(name)(data[key][0]));
+  } else {
+    return data[key].map(function(item) {
+      return Stream.onFetch(name, new meta.model(name)(item));
+    });
   }
-  if(meta[name] && meta[name][key]) {
-    return meta[name][key];
+}
+
+function unwrapBackboneAPI(name, data) {
+  if(!Array.isArray(data)) {
+    return Stream.onFetch(name, new (meta.model(name))(data));
+  } else {
+    return data.map(function(item) {
+      return Stream.onFetch(name, new (meta.model(name))(item));
+    });
   }
+}
+
+var unwrap = exports.unwrap = function(name, data) {
+  return unwrapBackboneAPI(name, data);
 };
 
 // Lookup from cache by id
@@ -274,7 +331,7 @@ exports.local = function local(name, id) {
 
 // Get all ids
 exports.keys = function(name) {
-  return Object.keys(cache[name]);
+  return (cache[name] ? Object.keys(cache[name]) : []);
 };
 
 // Location-unaware `get model`
@@ -285,7 +342,7 @@ exports.get = function get(name, id, onDone) {
     return onDone(undefined, item);
   }
   // do remote fetch if not locally available
-  if(!meta[name]) throw new Error(name + ' does not have a definition in the cache.');
+  if(!meta.get(name, 'url')) throw new Error(name + ' does not have a definition.');
 
   var uri = exports.uri(name, id);
   exports.fetch(name, uri, onDone);
@@ -293,12 +350,13 @@ exports.get = function get(name, id, onDone) {
 
 exports.uri = function(name, id) {
 // assume url + id for get by Id
-  var base = result(meta[name], 'url'),
+  var base = meta.result(name, 'url'),
       uri = base + (base.charAt(base.length - 1) === '/' ? '' : '/') + encodeURIComponent(id);
   return uri;
 };
 
 exports.store = function(name, values) {
+  if(!cache[name]) { cache[name] = {}; }
   // result may be a single item or array
   (Array.isArray(values) ? values : [ values ]).forEach(function(value) {
     if(value && value.id) {
@@ -317,6 +375,10 @@ exports.fetch = function(name, uri, onDone) {
   log.debug('ajax fetch to '+uri);
   ajax(uri, function(err, data) {
     if(err) return onDone(err, null);
+
+    // the data can be empty (e.g. nothing to hydrate)
+    if(!data) return onDone(null, data);
+
 
     // Order:
     // 1. unwrap
@@ -338,7 +400,8 @@ exports.fetch = function(name, uri, onDone) {
 };
 },
 "lib/stream.js": function(module, exports, require){
-var MicroEE = require('microee');
+var MicroEE = require('microee'),
+    log = require('minilog')('stream');
 // Single point to get events about models of a particular type.
 //
 // Note that creating models and then manually assigning ID's to them is not supported
@@ -357,11 +420,13 @@ var emitters = {};
 exports.bind = function(name, source) {
 
   function onChange(model, options) {
+    log.debug('change', name, model.get('id'));
     emitters[name].emit('change', model);
     emitters[name].emit('change:'+model.get('id'), model);
 
   }
   function onDestroy(model) {
+    log.debug('destroy', name, model.get('id'));
     emitters[name].emit('destroy', model);
     emitters[name].removeAllListeners('change', model);
     emitters[name].removeAllListeners('destroy', model);
@@ -411,6 +476,7 @@ exports.removeAllListeners = function(name, event, listener) {
 },
 "lib/hydrate.js": function(module, exports, require){
 var cache = require('./cache.js'),
+    meta = require('./meta.js'),
     Collection = require('backbone').Collection,
     log = require('minilog')('mmm/hydration');
 
@@ -441,12 +507,12 @@ function set(model, key, ids, results) {
 // and call the callback
 module.exports = function hydrate(name, models, onDone) {
   // if there is no hydratable relations, then just call the callback
-  if(!cache.meta(name, 'rels')) {
+  if(!meta.get(name, 'rels')) {
     return onDone(undefined, models);
   }
   var tasks = [],
       waiting = 0,
-      rels = cache.meta(name, 'rels'),
+      rels = meta.get(name, 'rels'),
       lastError = null;
   // support both arrays and individual models
   (Array.isArray(models) ? models : [ models ]).forEach(function(model) {

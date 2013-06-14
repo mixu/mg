@@ -18,6 +18,7 @@ if(typeof window == 'undefined') {
 
 // Define a correspondence between a name and a Model class (and metadata)
 exports.define = meta.define;
+exports.hydrate = hydrate;
 
 // Query API
 
@@ -153,13 +154,14 @@ exports.sync = function(name) {
             }
           });
 
+          // 2. hydrate -- existing model (e.g. inside parse)
+          // console.log('post-success', name, model, model.get('name'));
+          Stream.onFetch(name, model);
+
           // BB calls model.set with this
           return resp;
         };
-        // 2. hydrate -- existing model (e.g. inside parse)
         oldSuccess.apply(opts, arguments);
-        // console.log('post-success', name, model, model.get('name'));
-        Stream.onFetch(name, model);
       }
     }
     // delete can be tracked after this via the "destroy" event on the model
@@ -171,8 +173,6 @@ exports.sync = function(name) {
 // basically, just plucks out the right thing from the output
 exports.parse = function(name) {
   return function(resp, options) {
-    log.debug('parse', name, resp._id);
-    // 3. store in cache
     return resp;
   };
 };

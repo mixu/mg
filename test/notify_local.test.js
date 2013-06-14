@@ -3,7 +3,7 @@ var assert = require('assert'),
     http = require('http'),
     mmm = require('mmm'),
     server = require('./lib/test_server.js'),
-    Post = require('./lib/post.js'),
+    Post = require('./lib/models.js').Post,
     Backbone = require('backbone');
 
 // require('./lib/dataset.js')(mmm);

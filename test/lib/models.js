@@ -44,4 +44,9 @@ var Comment = Backbone.Model.extend({
 
 mmm.define('Comment', Comment);
 
-module.exports = Post;
+module.exports = {
+  Post: Post,
+  Posts: Posts,
+  Person: Person,
+  Comment: Comment
+};
