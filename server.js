@@ -1,4 +1,5 @@
-var url = require('url');
+var url = require('url'),
+    log = require('minilog')('server');
 
 function CollectionServer() {
  this.cache = {};
@@ -48,7 +49,10 @@ CollectionServer.prototype.onRequest = function(req, res) {
       collection = parts[0],
       result = {};
 
-  // console.log('path', parts);
+  log.info(req.method, req.url);
+  res.once('finish', function() {
+    log.info('end', req.url);
+  });
 
   if (req.headers.origin) {
     res.setHeader('Access-Control-Allow-Credentials', 'true');
@@ -167,13 +171,16 @@ CollectionServer.prototype.onRequest = function(req, res) {
           }
           return true;
         });
-        res.statusCode = 204;
+        // JSONAPI: res.statusCode = 204;
+        res.statusCode = 200;
         res.end();
       } else {
+        log.warn('Nothing matched', req.url);
         res.end();
       }
     });
   } else {
+    log.warn('Nothing matched', req.url);
     res.end();
   }
 };

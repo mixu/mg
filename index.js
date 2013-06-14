@@ -1,10 +1,19 @@
 var cache = require('./lib/cache.js'),
     hydrate = require('./lib/hydrate.js'),
     Stream = require('./lib/stream.js'),
-    Collection = require('backbone').Collection,
     Backbone = require('backbone'),
     ajax = require('./lib/ajax.js'),
     log = require('minilog')('mmm');
+
+if(typeof window == 'undefined') {
+  var najax = require('najax');
+  Backbone.$ = { ajax: function() {
+      var args = Array.prototype.slice.call(arguments);
+      console.log('ajax', args);
+      najax.apply(najax, args);
+    }
+  };
+}
 
 // Define a correspondence between a name and a Model class (and metadata)
 exports.define = cache.define;
@@ -32,6 +41,18 @@ function listRemote(name, onDone) {
   }
 }
 
+function listBoth(name, onDone) {
+  listLocal(name, function(err, localItems) {
+    listRemote(name, function(err, remoteItems) {
+      if(remoteItems) {
+        onDone(err, localItems.concat(remoteItems));
+      } else {
+        onDone(err, localItems);
+      }
+    });
+  });
+}
+
 // return a collection of models based on a set of conditions
 exports.find = function(name, conditions, onDone) {
   if(typeof conditions != 'object') {
@@ -49,13 +70,7 @@ exports.find = function(name, conditions, onDone) {
   }
   // this is how we say "get all"
   if(conditions.since == 0) {
-
-    return listRemote(name, onDone);
-
-
-    // this might involve a remote lookup later on
-    // for now just fetch all local items
-    // return listLocal(name, onDone);
+    return listBoth(name, onDone);
   }
 
   // search by something else -> needs to be run remotely, since we don't have the ability to
@@ -77,7 +92,7 @@ exports.findById = function(name, id, onDone) {
 
 // returns a pipeable stream
 exports.stream = function(name, conditions, collectionClass, onLoaded) {
-  var instance = (collectionClass ? new collectionClass() : new Collection());
+  var instance = (collectionClass ? new collectionClass() : new Backbone.Collection());
   // start the find
   exports.find(name, { since: 0 }, function(err, results) {
     // add the results to the collection
@@ -85,15 +100,20 @@ exports.stream = function(name, conditions, collectionClass, onLoaded) {
 
     onLoaded && onLoaded();
 
+    Stream.on(name, 'destroy', function(model) {
+        // console.log('MODEL destroy', model);
+        instance.remove(model);
+        // Can't seem to get the model.destroy to trigger the instance.remove event
+        // Not really sure why it doesn't go through to Backbone.
+        // But let's trigger it manually
+        instance.trigger('remove', model, instance, {});
+
+    });
     // subscribe to local "on-fetch-or-save" (with filter)
     // if remote subscription is supported, do that as well
     Stream.on(name, 'available', function(model) {
       // console.log('stream.available', model, model.get('name'));
       instance.add(model);
-
-      model.once('destroy', function() {
-        instance.remove(model);
-      });
     });
   });
 
@@ -103,7 +123,7 @@ exports.stream = function(name, conditions, collectionClass, onLoaded) {
 
 exports.sync = function(name) {
  return function(op, model, opts) {
-    log.info('sync', op, model, opts, name);
+    log.info('sync', op, name+'='+model.get('id'), opts);
 
     // to hook up to the stream, bind on "create"
     if(op == 'create') {
@@ -127,7 +147,7 @@ exports.sync = function(name) {
           Object.keys(rels).forEach(function(key) {
             var current = resp[key];
             if(!current || !current.add) {
-              resp[key] = new Collection();
+              resp[key] = new Backbone.Collection();
             }
           });
 
@@ -141,6 +161,7 @@ exports.sync = function(name) {
       }
     }
     // delete can be tracked after this via the "destroy" event on the model
+
     return Backbone.sync.apply(this, arguments);
   };
 };

@@ -6,13 +6,12 @@
   "scripts": {
     "test": "make test"
   },
-  "repository": "",
-  "author": "Mikito Takada <mikito.takada@gmail.com> (http://mixu.net/)",
-  "license": "BSD",
   "repository": {
     "type": "git",
     "url": "git://github.com/mixu/mmm.git"
   },
+  "author": "Mikito Takada <mikito.takada@gmail.com> (http://mixu.net/)",
+  "license": "BSD",
   "devDependencies": {
     "mocha": "~1.9.0",
     "express": "~3.2.4",
@@ -21,7 +20,8 @@
   },
   "dependencies": {
     "backbone": "~1.0.0",
-    "microee": "0.0.2"
+    "microee": "0.0.2",
+    "najax": "~0.1.05"
   },
   "peerDependencies": {
     "minilog": "~2.x"

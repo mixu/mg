@@ -2,7 +2,7 @@ var Backbone = require('backbone'),
     mmm = require('mmm');
 
 var Post = Backbone.Model.extend({
-  sync: mmm.sync,
+  sync: mmm.sync('Post'),
   type: 'Post',
   url: 'http://localhost:8000/posts',
   plural: 'posts',
@@ -21,6 +21,7 @@ var Post = Backbone.Model.extend({
 mmm.define('Post', Post);
 
 var Person = Backbone.Model.extend({
+  sync: mmm.sync('Person'),
   url: 'http://localhost:8000/people',
   plural: 'people'
 });
@@ -28,6 +29,7 @@ var Person = Backbone.Model.extend({
 mmm.define('Person', Person);
 
 var Comment = Backbone.Model.extend({
+  sync: mmm.sync('Comment'),
   url: 'http://localhost:8000/comments',
   plural: 'comments'
 });

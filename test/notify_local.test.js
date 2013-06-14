@@ -8,6 +8,8 @@ var assert = require('assert'),
 
 // require('./lib/dataset.js')(mmm);
 
+require('minilog').enable();
+
 exports['given two subscriptions to a model by id'] = {
 
   before: function(done) {
@@ -24,6 +26,7 @@ exports['given two subscriptions to a model by id'] = {
         // => collection subscriptions are filtered versions of this
 
         self.collection = mmm.stream('Post', { }, Backbone.Collection, function() {
+          console.log(util.inspect(self.collection.models, null, 3, true));
           done();
         });
       });
@@ -67,17 +70,26 @@ exports['given two subscriptions to a model by id'] = {
       var self = this;
 
       self.collection.once('add', function(model) {
-        assert.equal(model.get('name'), 'Bar');
+        assert.equal(model.get('name'), 'NewBar');
         done();
       });
 
-      new Post({ name: 'Bar'}).save();
+      new Post({ name: 'NewBar' }).save();
     },
 
     'can be notified of newly deleted model after destroy': function(done) {
-      this.collection.once('destroy', function(model) {
+      var self = this,
+          origLen = self.collection.length;
+
+      console.log(self.collection.pluck('name'));
+
+      self.collection.once('remove', function(model) {
         assert.equal(model.get('id'), 1);
-        done();
+        process.nextTick(function() {
+        console.log(self.collection);
+          assert.equal(self.collection.length, origLen - 1);
+          done();
+        });
       });
 
       mmm.findById('Post', 1, function(err, val) {
