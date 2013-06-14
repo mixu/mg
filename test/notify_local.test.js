@@ -25,7 +25,7 @@ exports['given two subscriptions to a model by id'] = {
         // create wildcard subscription on all models of a type
         // => collection subscriptions are filtered versions of this
 
-        self.collection = mmm.stream('Post', { }, Backbone.Collection, function() {
+        self.collection = mmm.stream('Post', { }, function() {
           console.log(util.inspect(self.collection.models, null, 3, true));
           done();
         });

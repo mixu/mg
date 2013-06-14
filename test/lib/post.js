@@ -6,6 +6,7 @@ var Post = Backbone.Model.extend({
   type: 'Post',
   url: 'http://localhost:8000/posts',
   plural: 'posts',
+  collection: 'Posts',
   rels: {
     'author': {
       href: 'http://localhost:8000/people/{author}',
@@ -19,6 +20,13 @@ var Post = Backbone.Model.extend({
 });
 
 mmm.define('Post', Post);
+
+var Posts = Backbone.Collection.extend({
+  // additional property
+  special: true
+});
+
+mmm.define('Posts', Posts);
 
 var Person = Backbone.Model.extend({
   sync: mmm.sync('Person'),

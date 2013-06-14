@@ -61,6 +61,21 @@ exports['given a simple model'] = {
     });
   },
 
+  'can hydrate a collection of individual models from a stream': function() {
+    var collection = mmm.stream('Post' , { }, function() {
+      console.log(collection);
+    });
+  },
+
+  'can hydrate a collection of one-many relationship models from a stream': function() {
+
+  },
+
+  'when hydrating a collection of items and the collection is empty, do not create any models': function(done) {
+//    mmm.stream('DataSource' , { }, function() {
+    done();
+  },
+
   'will wait properly for a pending request to complete rather than launching multiple requests': function(done) {
     done();
   },

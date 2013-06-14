@@ -1,4 +1,5 @@
 var cache = require('./lib/cache.js'),
+    meta = require('./lib/meta.js'),
     hydrate = require('./lib/hydrate.js'),
     Stream = require('./lib/stream.js'),
     Backbone = require('backbone'),
@@ -16,7 +17,7 @@ if(typeof window == 'undefined') {
 }
 
 // Define a correspondence between a name and a Model class (and metadata)
-exports.define = cache.define;
+exports.define = meta.define;
 
 // Query API
 
@@ -91,8 +92,8 @@ exports.findById = function(name, id, onDone) {
 };
 
 // returns a pipeable stream
-exports.stream = function(name, conditions, collectionClass, onLoaded) {
-  var instance = (collectionClass ? new collectionClass() : new Backbone.Collection());
+exports.stream = function(name, conditions, onLoaded) {
+  var instance = new (meta.collection(name))();
   // start the find
   exports.find(name, { since: 0 }, function(err, results) {
     // add the results to the collection
@@ -141,13 +142,14 @@ exports.sync = function(name) {
         // and do not go through the normal find/hydrate pipeline
         model.parse = function(resp, options) {
           model.parse = oldParse;
-          var rels = cache.meta(name, 'rels');
+          var rels = meta.get(name, 'rels');
           if(!rels || typeof rels != 'object') return resp;
 
           Object.keys(rels).forEach(function(key) {
-            var current = resp[key];
+            var current = resp[key],
+                currentType = rels[key].type;
             if(!current || !current.add) {
-              resp[key] = new Backbone.Collection();
+              resp[key] = new (meta.collection(currentType))();
             }
           });
 
@@ -169,7 +171,6 @@ exports.sync = function(name) {
 // basically, just plucks out the right thing from the output
 exports.parse = function(name) {
   return function(resp, options) {
-    var meta = cache.meta(name);
     log.debug('parse', name, resp._id);
     // 3. store in cache
     return resp;
