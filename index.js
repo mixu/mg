@@ -103,7 +103,7 @@ exports.stream = function(name, conditions, onLoaded) {
     onLoaded && onLoaded();
 
     Stream.on(name, 'destroy', function(model) {
-        // console.log('MODEL destroy', model);
+        log.info('mmm.stream remove collection', instance, model);
         instance.remove(model);
         // Can't seem to get the model.destroy to trigger the instance.remove event
         // Not really sure why it doesn't go through to Backbone.
@@ -143,6 +143,11 @@ exports.sync = function(name) {
         // and do not go through the normal find/hydrate pipeline
         model.parse = function(resp, options) {
           model.parse = oldParse;
+
+          // 1. hydrate -- existing model (e.g. inside parse)
+          // the issue here is that hydrate requires a async() api
+          // but Backbone parse only works with a synchronous API
+
           var rels = meta.get(name, 'rels');
           if(!rels || typeof rels != 'object') return resp;
 
@@ -150,13 +155,19 @@ exports.sync = function(name) {
             var current = resp[key],
                 currentType = rels[key].type;
             if(!current || !current.add) {
+              log.debug('Initializing collection "'+key+'" of type "'+meta.get(currentType, 'collection')+'" in `.parse` interception for '+name);
               resp[key] = new (meta.collection(currentType))();
             }
           });
 
-          // 2. hydrate -- existing model (e.g. inside parse)
-          // console.log('post-success', name, model, model.get('name'));
-          Stream.onFetch(name, model);
+          // Tricky!
+          // The Stream notification call has to occur after the model is completely set.
+          // Since BB calls model.set(model.parse( ... )), the properties
+          // are not set until we return from parse
+          // The success function emits "sync" so we'll use that
+          model.once('sync', function() {
+            Stream.onFetch(name, model);
+          });
 
           // BB calls model.set with this
           return resp;

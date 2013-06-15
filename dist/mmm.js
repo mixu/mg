@@ -24,6 +24,7 @@ if(typeof window == 'undefined') {
 
 // Define a correspondence between a name and a Model class (and metadata)
 exports.define = meta.define;
+exports.hydrate = hydrate;
 
 // Query API
 
@@ -108,7 +109,7 @@ exports.stream = function(name, conditions, onLoaded) {
     onLoaded && onLoaded();
 
     Stream.on(name, 'destroy', function(model) {
-        // console.log('MODEL destroy', model);
+        log.info('mmm.stream remove collection', instance, model);
         instance.remove(model);
         // Can't seem to get the model.destroy to trigger the instance.remove event
         // Not really sure why it doesn't go through to Backbone.
@@ -148,6 +149,10 @@ exports.sync = function(name) {
         // and do not go through the normal find/hydrate pipeline
         model.parse = function(resp, options) {
           model.parse = oldParse;
+
+          // the issue here is that hydrate requires a async() api
+          // but Backbone parse only works with a synchronous API
+
           var rels = meta.get(name, 'rels');
           if(!rels || typeof rels != 'object') return resp;
 
@@ -155,6 +160,7 @@ exports.sync = function(name) {
             var current = resp[key],
                 currentType = rels[key].type;
             if(!current || !current.add) {
+              log.debug('Initializing collection during model.parse interception', key);
               resp[key] = new (meta.collection(currentType))();
             }
           });
@@ -178,8 +184,6 @@ exports.sync = function(name) {
 // basically, just plucks out the right thing from the output
 exports.parse = function(name) {
   return function(resp, options) {
-    log.debug('parse', name, resp._id);
-    // 3. store in cache
     return resp;
   };
 };
@@ -248,7 +252,7 @@ exports.get = function(name, key) {
 exports.result = function(name, key) {
   var value = exports.get(name, key);
   // if a property is a function, evaluate it
-  return (typeof value === 'function' ? value.call(object) : value);
+  return (typeof value === 'function' ? value.call(meta[name]) : value);
 };
 
 // get the model class for the given name
@@ -298,30 +302,26 @@ var Stream = require('./stream.js'),
 
 var cache = {};
 
-function unwrapJSONAPI(name, data) {
+function unwrapJSONAPI(name, data, eachFn) {
   // expect { modelName: [ { .. model .. }, .. ]}
   var key = meta.get(name, 'plural');
   if(data[key].length == 1) {
-    return Stream.onFetch(name, new meta.model(name)(data[key][0]));
+    eachFn(data[key][0]);
   } else {
-    return data[key].map(function(item) {
-      return Stream.onFetch(name, new meta.model(name)(item));
-    });
+    data[key].map(eachFn);
   }
 }
 
-function unwrapBackboneAPI(name, data) {
+function unwrapBackboneAPI(name, data, eachFn) {
   if(!Array.isArray(data)) {
-    return Stream.onFetch(name, new (meta.model(name))(data));
+    eachFn(data);
   } else {
-    return data.map(function(item) {
-      return Stream.onFetch(name, new (meta.model(name))(item));
-    });
+    data.map(eachFn);
   }
 }
 
-var unwrap = exports.unwrap = function(name, data) {
-  return unwrapBackboneAPI(name, data);
+function unwrap(name, data, eachFn) {
+  unwrapBackboneAPI(name, data, eachFn);
 };
 
 // Lookup from cache by id
@@ -355,10 +355,17 @@ exports.uri = function(name, id) {
   return uri;
 };
 
+// TODO: support traversing a large, fully hydrated object!
 exports.store = function(name, values) {
   if(!cache[name]) { cache[name] = {}; }
+
   // result may be a single item or array
   (Array.isArray(values) ? values : [ values ]).forEach(function(value) {
+
+    // this is the right point to notify the stream - once the model instances
+    // have been fetched, unwrapped and hydrated.
+    Stream.onFetch(name, value);
+
     if(value && value.id) {
       log.debug('Storing fetch result in cache', name, value.id);
       cache[name][value.id] = value;
@@ -377,31 +384,32 @@ exports.fetch = function(name, uri, onDone) {
     if(err) return onDone(err, null);
 
     // the data can be empty (e.g. nothing to hydrate)
-    if(!data) return onDone(null, data);
+    if(!data || data.length == 0) {
+      log.debug('ajax empty onDone '+uri);
+     return onDone(null, data);
+    }
 
 
     // Order:
     // 1. unwrap
+    unwrap(name, data, function(item) {
+      // 2. hydrate (each item)
+      hydrate(name, item, function(err, values) {
+        if(err) return onDone(err, null);
+        // 3. store in cache
+        exports.store(name, values);
 
-    // 1.A: if a model with the corresponding id
-
-
-
-    // 2. hydrate
-    hydrate(name, exports.unwrap(name, data), function(err, values) {
-      if(err) return onDone(err, null);
-      // 3. store in cache
-      exports.store(name, values);
-
-      // 4. pass back
-      onDone(null, values);
-    });
+        // 4. pass back
+        log.debug('ajax fetch onDone '+uri);
+        onDone(null, values);
+      });
+    })
   });
 };
 },
 "lib/stream.js": function(module, exports, require){
 var MicroEE = require('microee'),
-    log = require('minilog')('stream');
+    log = require('minilog')('mmm/stream');
 // Single point to get events about models of a particular type.
 //
 // Note that creating models and then manually assigning ID's to them is not supported
@@ -420,13 +428,13 @@ var emitters = {};
 exports.bind = function(name, source) {
 
   function onChange(model, options) {
-    log.debug('change', name, model.get('id'));
+    log.debug('change', name, model.id);
     emitters[name].emit('change', model);
-    emitters[name].emit('change:'+model.get('id'), model);
+    emitters[name].emit('change:'+model.id, model);
 
   }
   function onDestroy(model) {
-    log.debug('destroy', name, model.get('id'));
+    log.debug('destroy', name, model.id);
     emitters[name].emit('destroy', model);
     emitters[name].removeAllListeners('change', model);
     emitters[name].removeAllListeners('destroy', model);
@@ -484,7 +492,7 @@ if(typeof window != 'undefined' && window.Cato) {
   Collection.prototype.pipe = Cato.Collection.prototype.pipe;
 }
 
-function set(model, key, ids, results) {
+function set(model, collectionClass, key, ids, results) {
   // if the original wrapper was an array, then we need to wrap this item in a collection
   if(Array.isArray(ids)) {
     var current = model.get(key);
@@ -495,7 +503,7 @@ function set(model, key, ids, results) {
     } else {
       // initialize
       log.info('Initializing collection during hydration', key, model, results);
-      model.set(key, new Collection(results));
+      model.set(key, new collectionClass(results));
     }
   } else {
     // otherwise, it's a singular property
@@ -506,17 +514,29 @@ function set(model, key, ids, results) {
 // given a fetched object, populate any refs to foreign models in it
 // and call the callback
 module.exports = function hydrate(name, models, onDone) {
-  // if there is no hydratable relations, then just call the callback
-  if(!meta.get(name, 'rels')) {
-    return onDone(undefined, models);
-  }
   var tasks = [],
       waiting = 0,
       rels = meta.get(name, 'rels'),
-      lastError = null;
+      lastError = null,
+      modelClass = meta.model(name),
+      // need to return a non-array for single result
+      isArray = Array.isArray(models);
   // support both arrays and individual models
-  (Array.isArray(models) ? models : [ models ]).forEach(function(model) {
+  if(!isArray) {
+    models = [ models ];
+  }
+
+  models.forEach(function(model, index) {
     log.info('Hydrating '+ name, model.id, model, rels);
+
+    // hydration can instantiate the model in necessary
+    if(!(model instanceof modelClass)) {
+      log.info('Not an instance of '+name+', instantiating model.');
+      model = models[index] = new modelClass(model);
+    }
+
+    // skip to next without queuing task if no rels
+    if(!rels) return;
 
     // for each hydration task, there is an array of relation keys to fill in
     Object.keys(rels).forEach(function(key) {
@@ -541,7 +561,8 @@ module.exports = function hydrate(name, models, onDone) {
       if(Array.isArray(ids)) {
         var current = model.get(key);
         if(!current || !current.add) {
-          model.set(key, new Collection());
+          log.info('Initializing collection during hydration', key);
+          model.set(key, new (meta.collection(modelName))());
         }
       }
 
@@ -564,7 +585,7 @@ module.exports = function hydrate(name, models, onDone) {
           var value = cache.local(modelName, id);
           if(value) {
             log.info('Hydrating from local cache', modelName, id);
-            set(model, key, ids, value);
+            set(model, meta.collection(modelName), key, ids, value);
             return done();
           }
           cache.get(modelName, id, function(err, results) {
@@ -578,7 +599,7 @@ module.exports = function hydrate(name, models, onDone) {
 
             log.info('Complete hydration for:', modelName, id);
             // set value
-            set(model, key, ids, results);
+            set(model, meta.collection(modelName), key, ids, results);
             done();
           })
         });
@@ -592,7 +613,7 @@ module.exports = function hydrate(name, models, onDone) {
         return series(tasks.shift());
       });
     } else {
-      return onDone(lastError, models);
+      return onDone(lastError, (!isArray ? models[0] : models));
     }
   }
   series(tasks.shift());

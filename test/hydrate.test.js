@@ -26,13 +26,17 @@ exports['test hydration'] = {
     });
   },
 
+  'can hydrate a model with a association': function(done) {
+    setTimeout(done, 10);
+  },
+
+
   //'if the model to be hydrated exists in cache, then update and reuse the cached model': function(done)
 
   //'if the hydration is passed an instance of a model and new data ...'
 
   // Post has a rel to author and comment
 
-  //'can hydrate a model with a association':
 
 };
 
