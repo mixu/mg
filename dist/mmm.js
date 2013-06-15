@@ -150,6 +150,7 @@ exports.sync = function(name) {
         model.parse = function(resp, options) {
           model.parse = oldParse;
 
+          // 1. hydrate -- existing model (e.g. inside parse)
           // the issue here is that hydrate requires a async() api
           // but Backbone parse only works with a synchronous API
 
@@ -160,14 +161,19 @@ exports.sync = function(name) {
             var current = resp[key],
                 currentType = rels[key].type;
             if(!current || !current.add) {
-              log.debug('Initializing collection during model.parse interception', key);
+              log.debug('Initializing collection "'+key+'" of type "'+meta.get(currentType, 'collection')+'" in `.parse` interception for '+name);
               resp[key] = new (meta.collection(currentType))();
             }
           });
 
-          // 2. hydrate -- existing model (e.g. inside parse)
-          // console.log('post-success', name, model, model.get('name'));
-          Stream.onFetch(name, model);
+          // Tricky!
+          // The Stream notification call has to occur after the model is completely set.
+          // Since BB calls model.set(model.parse( ... )), the properties
+          // are not set until we return from parse
+          // The success function emits "sync" so we'll use that
+          model.once('sync', function() {
+            Stream.onFetch(name, model);
+          });
 
           // BB calls model.set with this
           return resp;
@@ -302,26 +308,24 @@ var Stream = require('./stream.js'),
 
 var cache = {};
 
-function unwrapJSONAPI(name, data, eachFn) {
+// returns an plain array (multiple items) or a plain object (single item)
+function unwrapJSONAPI(name, data) {
   // expect { modelName: [ { .. model .. }, .. ]}
   var key = meta.get(name, 'plural');
   if(data[key].length == 1) {
-    eachFn(data[key][0]);
+    return data[key][0];
   } else {
-    data[key].map(eachFn);
+    return data[key];
   }
 }
 
-function unwrapBackboneAPI(name, data, eachFn) {
-  if(!Array.isArray(data)) {
-    eachFn(data);
-  } else {
-    data.map(eachFn);
-  }
+// returns an plain array (multiple items) or a plain object (single item)
+function unwrapBackboneAPI(name, data) {
+  return data;
 }
 
-function unwrap(name, data, eachFn) {
-  unwrapBackboneAPI(name, data, eachFn);
+function unwrap(name, data) {
+  return unwrapBackboneAPI(name, data);
 };
 
 // Lookup from cache by id
@@ -389,21 +393,20 @@ exports.fetch = function(name, uri, onDone) {
      return onDone(null, data);
     }
 
-
     // Order:
     // 1. unwrap
-    unwrap(name, data, function(item) {
-      // 2. hydrate (each item)
-      hydrate(name, item, function(err, values) {
-        if(err) return onDone(err, null);
-        // 3. store in cache
-        exports.store(name, values);
+    // 2. hydrate (all items)
+    hydrate(name, unwrap(name, data), function(err, values) {
+      if(err) {
+        return onDone(err, null);
+      }
+      // 3. store in cache
+      exports.store(name, values);
 
-        // 4. pass back
-        log.debug('ajax fetch onDone '+uri);
-        onDone(null, values);
-      });
-    })
+      // 4. pass back
+      log.debug('ajax fetch onDone '+uri);
+      onDone(null, values);
+    });
   });
 };
 },
