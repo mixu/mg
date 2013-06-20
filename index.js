@@ -114,7 +114,7 @@ exports.stream = function(name, conditions, onLoaded) {
     // subscribe to local "on-fetch-or-save" (with filter)
     // if remote subscription is supported, do that as well
     Stream.on(name, 'available', function(model) {
-      // console.log('stream.available', model, model.get('name'));
+      log.info('mmm.stream.available', model, model.get('name'));
       instance.add(model);
     });
   });
@@ -149,6 +149,18 @@ exports.sync = function(name) {
           // but Backbone parse only works with a synchronous API
 
           var rels = meta.get(name, 'rels');
+
+          // Tricky!
+          // The Stream notification call has to occur after the model is completely set.
+          // Since BB calls model.set(model.parse( ... )), the properties
+          // are not set until we return from parse
+          // The success function emits "sync" so we'll use that
+          model.once('sync', function() {
+            log.debug('model.sync', name, model.id);
+            Stream.onFetch(name, model);
+          });
+
+          // set the onSync callback before this
           if(!rels || typeof rels != 'object') return resp;
 
           Object.keys(rels).forEach(function(key) {
@@ -159,16 +171,6 @@ exports.sync = function(name) {
               resp[key] = new (meta.collection(currentType))();
             }
           });
-
-          // Tricky!
-          // The Stream notification call has to occur after the model is completely set.
-          // Since BB calls model.set(model.parse( ... )), the properties
-          // are not set until we return from parse
-          // The success function emits "sync" so we'll use that
-          model.once('sync', function() {
-            Stream.onFetch(name, model);
-          });
-
           // BB calls model.set with this
           return resp;
         };

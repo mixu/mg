@@ -120,7 +120,7 @@ exports.stream = function(name, conditions, onLoaded) {
     // subscribe to local "on-fetch-or-save" (with filter)
     // if remote subscription is supported, do that as well
     Stream.on(name, 'available', function(model) {
-      // console.log('stream.available', model, model.get('name'));
+      log.info('mmm.stream.available', model, model.get('name'));
       instance.add(model);
     });
   });
@@ -155,6 +155,18 @@ exports.sync = function(name) {
           // but Backbone parse only works with a synchronous API
 
           var rels = meta.get(name, 'rels');
+
+          // Tricky!
+          // The Stream notification call has to occur after the model is completely set.
+          // Since BB calls model.set(model.parse( ... )), the properties
+          // are not set until we return from parse
+          // The success function emits "sync" so we'll use that
+          model.once('sync', function() {
+            log.debug('model.sync', name, model.id);
+            Stream.onFetch(name, model);
+          });
+
+          // set the onSync callback before this
           if(!rels || typeof rels != 'object') return resp;
 
           Object.keys(rels).forEach(function(key) {
@@ -165,16 +177,6 @@ exports.sync = function(name) {
               resp[key] = new (meta.collection(currentType))();
             }
           });
-
-          // Tricky!
-          // The Stream notification call has to occur after the model is completely set.
-          // Since BB calls model.set(model.parse( ... )), the properties
-          // are not set until we return from parse
-          // The success function emits "sync" so we'll use that
-          model.once('sync', function() {
-            Stream.onFetch(name, model);
-          });
-
           // BB calls model.set with this
           return resp;
         };
@@ -372,6 +374,12 @@ exports.store = function(name, values) {
 
     if(value && value.id) {
       log.debug('Storing fetch result in cache', name, value.id);
+      if(cache[name][value.id]) {
+        log.error('Skipping - already cached! ', name, value.id);
+        // should update the cache in a way that doesn't invalidate,
+        // or better yet, fix in upstream so that we don't try to hydrate things that exist
+        return;
+      }
       cache[name][value.id] = value;
     } else {
       log.error('Unknown cache.store value', value);
@@ -426,18 +434,26 @@ var MicroEE = require('microee'),
 
 var emitters = {};
 
+function numCallbacks(name, event) {
+  if (emitters[name] && emitters[name]._events &&
+     emitters[name]._events && emitters[name]._events[event]) {
+    return (typeof emitters[name]._events[event] == 'function' ? 1 : emitters[name]._events[event].length);
+  }
+  return 0;
+}
+
 // each model has to be created for it to generate any events
 // this is called on create; the stream should then attach to the relevant events
 exports.bind = function(name, source) {
 
   function onChange(model, options) {
-    log.debug('change', name, model.id);
+    log.debug('change', name, model.id, numCallbacks(name, 'change'), emitters);
     emitters[name].emit('change', model);
     emitters[name].emit('change:'+model.id, model);
 
   }
   function onDestroy(model) {
-    log.debug('destroy', name, model.id);
+    log.debug('destroy', name, model.id, numCallbacks(name, 'destroy'), emitters);
     emitters[name].emit('destroy', model);
     emitters[name].removeAllListeners('change', model);
     emitters[name].removeAllListeners('destroy', model);
@@ -450,9 +466,8 @@ exports.bind = function(name, source) {
 // all tracked models originate on the server.
 // for now, no support for models that do not have an id
 exports.onFetch = function(name, instance) {
-//  console.log('onFetch', name, instance);
-
   if(!emitters[name]) { emitters[name] = new MicroEE(); }
+  log.debug('available', name, instance.id, numCallbacks(name, 'available'), emitters);
   exports.bind(name, instance);
   emitters[name].emit('available', instance);
   return instance; // for easy application
@@ -463,24 +478,29 @@ exports.onFetch = function(name, instance) {
 exports.on = function(name, event, listener) {
   if(!emitters[name]) { emitters[name] = new MicroEE(); }
   emitters[name].on(event, listener);
+  log.debug('reg: on', name, event, numCallbacks(name, event), emitters);
 };
 
 exports.once = function(name, event, listener) {
   if(!emitters[name]) { emitters[name] = new MicroEE(); }
   emitters[name].once(event, listener);
+  log.debug('reg: once', name, event, numCallbacks(name, event), emitters);
 };
 
 exports.when = function(name, event, listener) {
   if(!emitters[name]) { emitters[name] = new MicroEE(); }
   emitters[name].when(event, listener);
+  log.debug('reg: when', name, event, numCallbacks(name, event), emitters);
 };
 
 exports.removeListener = function(name, event, listener) {
+  log.debug('removeListener', name, event, numCallbacks(name, event), emitters);
   if(!emitters[name]) return this;
   emitters[name].removeListener(event, listener);
 };
 
 exports.removeAllListeners = function(name, event, listener) {
+  log.debug('removeAllListeners', name, event, numCallbacks(name, event), emitters);
   if(!emitters[name]) return this;
   emitters[name].removeAllListeners(event, listener);
 };
