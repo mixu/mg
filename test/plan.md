@@ -1,0 +1,30 @@
+# mmm testing plan
+
+- Test hydrating multiple rels for a single object
+- Test hydrating rels of rels
+- Implement a .get() function that supports paths so that long chains of gets do not need a million checks
+  - Ensure that if the field is type:string but empty, the result is an empty string
+  - Ensure that if the field is type:object but empty, the result is ?? something with a getter?
+  - Ensure that if the field is type:collection but empty, the results is a collection
+  - Ensure that if the field is type:array but empty, the result is an array
+  - Ensure that if the field is type:date but empty, the results is a 1970's date
+  - Ensure that if the field is type:regexp but empty, the result is a regexp
+- Allow the .get function to also traverse arrays and collections (equivalently)
+  - ?? when content changes ??
+- Allow the .get function to also access object properties and model properties (equivalently)
+  - .. and object properties of an array / collection
+  - .. and model properties of a collection / an array
+- Figure out how to handle the case where if a get path is not empty, we should do a thing (e.g. like returning from a ternary or iterating a collection)
+- Test hydration of dates as Date objects
+  - Test that such fields are initialized sensibly if they are empty/undefined
+- Test the ability to specify an arbitrary set of objects as dependencies and a onDone function
+- Test the ability to stream two collections from the same set of criteria, but apply a sort on only one of them.
+- Test optional validation based on field types (+ required)
+- Test offering models fetched from nonstandard endpoints (e.g. /datasources/uploads) into the cache
+- Test hydrating collections of models from nonstandard/bulk endpoints where the models are already in the cache
+- Test loading from a serialized format (e.g. for initial load)
+- Test custom parse actions, such as instantiating a custom model from an object structure
+- Test re-serializing hydrated models to JSON (particularly after adding / removing associated models)
+- Allow hydrating from a custom endpoint, where the URL is given by the user and the result JSON is either a single model or a collection
+- Test reverse associations (e.g. script.projectId <=> project.scripts)
+- Allow specifying default values
