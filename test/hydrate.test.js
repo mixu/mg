@@ -1,11 +1,31 @@
 var assert = require('assert'),
     util = require('util'),
     mmm = require('mmm'),
-    Model = require('./lib/models.js');
+    Model = require('./lib/models.js'),
+    cache = require('../lib/cache.js'),
+    ajax = require('../lib/ajax.js');
 
 require('minilog').enable();
 
 exports['test hydration'] = {
+
+  before: function() {
+    var self = this;
+    this.ajaxCalls = [];
+    cache._setAjax(function(uri, callback) {
+      self.ajaxCalls.push([uri]);
+      if(uri == 'http://localhost:8721/people/1000') {
+        callback(null, {
+          id: 1000,
+          name: 'Bar'
+        });
+      }
+    });
+  },
+
+  after: function() {
+    cache._setAjax(ajax);
+  },
 
   'can hydrate a simple model': function(done) {
     mmm.hydrate('Comment', { text: 'foo' }, function(err, comment) {
@@ -27,16 +47,56 @@ exports['test hydration'] = {
   },
 
   'can hydrate a model with a association': function(done) {
-    setTimeout(done, 10);
+    var self = this;
+    mmm.hydrate('Post', {
+        id: 1,
+        name: 'Foo',
+        author: 1000
+      }, function(err, val) {
+      // check that the model id is correct
+      assert.equal(val.get('id'), 1);
+      // and the model contains a child model, author
+      assert.equal(val.get('author').get('name'), 'Bar');
+
+      self.postInstance = val;
+
+      done();
+    });
   },
 
+  'if the model to be hydrated exists in cache, then update and reuse the cached model': function(done) {
+    var self = this;
+    this.ajaxCalls = [];
+    mmm.hydrate('Post', {
+        id: 1,
+        name: 'New post',
+        author: 1000
+      }, function(err, val) {
+      // assert that no ajax calls were made
+      assert.equal(self.ajaxCalls.length, 0);
 
-  //'if the model to be hydrated exists in cache, then update and reuse the cached model': function(done)
+      // assert that the instance was reused
+      assert.strictEqual(val,  self.postInstance);
+      // with updated value
+      assert.equal(val.get('name'), 'New post');
+      // and the rest of the data is like before
+      assert.equal(val.get('id'), 1);
+      assert.equal(val.get('author').get('name'), 'Bar');
+
+      done();
+    });
+  },
 
   //'if the hydration is passed an instance of a model and new data ...'
 
-  // Post has a rel to author and comment
+  'can hydrate a model with two associations': function() {
 
+
+  },
+
+  'can hydrate a model with a association that has a child association': function() {
+
+  }
 
 };
 

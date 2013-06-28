@@ -10,7 +10,7 @@ if(typeof window == 'undefined') {
   var najax = require('najax');
   Backbone.$ = { ajax: function() {
       var args = Array.prototype.slice.call(arguments);
-      console.log('ajax', args);
+      // console.log('ajax', args);
       najax.apply(najax, args);
     }
   };
@@ -103,7 +103,7 @@ exports.stream = function(name, conditions, onLoaded) {
     onLoaded && onLoaded();
 
     Stream.on(name, 'destroy', function(model) {
-        log.info('mmm.stream remove collection', instance, model);
+        log.info('mmm.stream remove collection', instance.id, model.id);
         instance.remove(model);
         // Can't seem to get the model.destroy to trigger the instance.remove event
         // Not really sure why it doesn't go through to Backbone.
@@ -114,7 +114,7 @@ exports.stream = function(name, conditions, onLoaded) {
     // subscribe to local "on-fetch-or-save" (with filter)
     // if remote subscription is supported, do that as well
     Stream.on(name, 'available', function(model) {
-      log.info('mmm.stream.available', model, model.get('name'));
+      log.info('mmm.stream.available', model.id, model.get('name'));
       instance.add(model);
     });
   });

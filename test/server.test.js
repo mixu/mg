@@ -26,7 +26,7 @@ exports['reading items'] = {
       path: '/people/1000',
       method: 'GET'
     }, function(err, data) {
-      console.log(data);
+      // console.log(data);
       // expect { people: [ { .. model .. } ] }
       assert.ok(data.people);
       assert.ok(Array.isArray(data.people));
@@ -41,7 +41,7 @@ exports['reading items'] = {
       path: '/comments?ids=1,2',
       method: 'GET'
     }, function(err, data) {
-      console.log(data);
+      // console.log(data);
       // expect { comments: [ { .. model .. } ] }
       assert.ok(data.comments);
       assert.ok(Array.isArray(data.comments));
@@ -57,7 +57,7 @@ exports['reading items'] = {
       path: '/comments/1,2',
       method: 'GET'
     }, function(err, data) {
-      console.log(data);
+      // console.log(data);
       // expect { comments: [ { .. model .. } ] }
       assert.ok(data.comments);
       assert.ok(Array.isArray(data.comments));
@@ -87,7 +87,7 @@ exports['creating, updating, deleting'] = {
       method: 'POST',
       data: JSON.stringify({ name: 'new comment' })
     }, function(err, data, res) {
-      console.log(data);
+      // console.log(data);
 
       // MUST respond with a 201 Created
       assert.equal(res.statusCode, 201);

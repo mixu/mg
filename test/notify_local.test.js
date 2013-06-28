@@ -16,7 +16,7 @@ exports['given two subscriptions to a model by id'] = {
     var self = this;
     this.server = http.createServer(function(req, res) {
       server.onRequest(req, res);
-    }).listen(8000).on('listening', function() {
+    }).listen(8721).on('listening', function() {
 
       // create direct subscription
       mmm.findById('Post', 1, function(err, val) {
@@ -26,7 +26,7 @@ exports['given two subscriptions to a model by id'] = {
         // => collection subscriptions are filtered versions of this
 
         self.collection = mmm.stream('Post', { }, function() {
-          console.log(util.inspect(self.collection.models, null, 3, true));
+          // console.log(util.inspect(self.collection.models, null, 3, true));
           done();
         });
       });
@@ -43,7 +43,7 @@ exports['given two subscriptions to a model by id'] = {
       var self = this;
 
       self.model.once('change:name', function(model, value, options) {
-        console.log('model change name to', value);
+        // console.log('model change name to', value);
         done();
       });
 
@@ -81,12 +81,12 @@ exports['given two subscriptions to a model by id'] = {
       var self = this,
           origLen = self.collection.length;
 
-      console.log(self.collection.pluck('name'));
+      // console.log(self.collection.pluck('name'));
 
       self.collection.once('remove', function(model) {
         assert.equal(model.get('id'), 1);
         process.nextTick(function() {
-        console.log(self.collection);
+        // console.log(self.collection);
           assert.equal(self.collection.length, origLen - 1);
           done();
         });

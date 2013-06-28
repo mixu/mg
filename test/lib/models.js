@@ -4,16 +4,14 @@ var Backbone = require('backbone'),
 var Post = Backbone.Model.extend({
   sync: mmm.sync('Post'),
   type: 'Post',
-  url: 'http://localhost:8000/posts',
+  url: 'http://localhost:8721/posts',
   plural: 'posts',
   collection: 'Posts',
   rels: {
     'author': {
-      href: 'http://localhost:8000/people/{author}',
       type: 'Person'
     },
     'comments': {
-      href: 'http://localhost:8000/comments/{comments}',
       type: 'Comment'
     }
   }
@@ -30,7 +28,7 @@ mmm.define('Posts', Posts);
 
 var Person = Backbone.Model.extend({
   sync: mmm.sync('Person'),
-  url: 'http://localhost:8000/people',
+  url: 'http://localhost:8721/people',
   plural: 'people'
 });
 
@@ -38,7 +36,7 @@ mmm.define('Person', Person);
 
 var Comment = Backbone.Model.extend({
   sync: mmm.sync('Comment'),
-  url: 'http://localhost:8000/comments',
+  url: 'http://localhost:8721/comments',
   plural: 'comments'
 });
 
