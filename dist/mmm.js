@@ -16,7 +16,7 @@ if(typeof window == 'undefined') {
   var najax = require('najax');
   Backbone.$ = { ajax: function() {
       var args = Array.prototype.slice.call(arguments);
-      console.log('ajax', args);
+      // console.log('ajax', args);
       najax.apply(najax, args);
     }
   };
@@ -109,7 +109,7 @@ exports.stream = function(name, conditions, onLoaded) {
     onLoaded && onLoaded();
 
     Stream.on(name, 'destroy', function(model) {
-        log.info('mmm.stream remove collection', instance, model);
+        log.info('mmm.stream remove collection', instance.id, model.id);
         instance.remove(model);
         // Can't seem to get the model.destroy to trigger the instance.remove event
         // Not really sure why it doesn't go through to Backbone.
@@ -120,7 +120,7 @@ exports.stream = function(name, conditions, onLoaded) {
     // subscribe to local "on-fetch-or-save" (with filter)
     // if remote subscription is supported, do that as well
     Stream.on(name, 'available', function(model) {
-      log.info('mmm.stream.available', model, model.get('name'));
+      log.info('mmm.stream.available', model.id, model.get('name'));
       instance.add(model);
     });
   });
@@ -131,7 +131,7 @@ exports.stream = function(name, conditions, onLoaded) {
 
 exports.sync = function(name) {
  return function(op, model, opts) {
-    log.info('sync', op, name+'='+model.get('id'), opts);
+    log.info('sync', op, name+'='+model.id, model, opts);
 
     // to hook up to the stream, bind on "create"
     if(op == 'create') {
@@ -211,7 +211,7 @@ function fetch(uri, callback) {
     parts.hostname = 'localhost';
     parts.port = 8000;
   }
-  console.log(parts);
+
   return request({ hostname: parts.hostname, path: parts.pathname, port: parts.port }, function(err, data, res) {
     callback(err, data);
   });
@@ -228,8 +228,8 @@ function ajaxFetch(uri, callback) {
       },
       error: function(jqXHR, textStatus, httpPortion) {
         // the textStatus is often not helpful (e.g. "error" for HTTP errors)
-        if(textStatus == 'error') {
-          return callback(jqXHR.status, null);
+        if(textStatus == 'error' && jqXHR) {
+          return callback(jqXHR, null);
         }
         callback(textStatus, null);
       }
@@ -396,8 +396,8 @@ exports.fetch = function(name, uri, onDone) {
     if(err) return onDone(err, null);
 
     // the data can be empty (e.g. nothing to hydrate)
-    if(!data || data.length == 0) {
-      log.debug('ajax empty onDone '+uri);
+    if(!data || Array.isArray(data) && data.length == 0) {
+      log.debug('ajax empty onDone '+uri, data);
      return onDone(null, data);
     }
 
@@ -416,6 +416,10 @@ exports.fetch = function(name, uri, onDone) {
       onDone(null, values);
     });
   });
+};
+
+exports._setAjax = function(obj) {
+  ajax = obj;
 };
 },
 "lib/stream.js": function(module, exports, require){
@@ -447,13 +451,13 @@ function numCallbacks(name, event) {
 exports.bind = function(name, source) {
 
   function onChange(model, options) {
-    log.debug('change', name, model.id, numCallbacks(name, 'change'), emitters);
+    log.debug('change', name, model.id, numCallbacks(name, 'change'));
     emitters[name].emit('change', model);
     emitters[name].emit('change:'+model.id, model);
 
   }
   function onDestroy(model) {
-    log.debug('destroy', name, model.id, numCallbacks(name, 'destroy'), emitters);
+    log.debug('destroy', name, model.id, numCallbacks(name, 'destroy'));
     emitters[name].emit('destroy', model);
     emitters[name].removeAllListeners('change', model);
     emitters[name].removeAllListeners('destroy', model);
@@ -467,7 +471,7 @@ exports.bind = function(name, source) {
 // for now, no support for models that do not have an id
 exports.onFetch = function(name, instance) {
   if(!emitters[name]) { emitters[name] = new MicroEE(); }
-  log.debug('available', name, instance.id, numCallbacks(name, 'available'), emitters);
+  log.debug('available', name, instance.id, numCallbacks(name, 'available'));
   exports.bind(name, instance);
   emitters[name].emit('available', instance);
   return instance; // for easy application
@@ -478,29 +482,29 @@ exports.onFetch = function(name, instance) {
 exports.on = function(name, event, listener) {
   if(!emitters[name]) { emitters[name] = new MicroEE(); }
   emitters[name].on(event, listener);
-  log.debug('reg: on', name, event, numCallbacks(name, event), emitters);
+  log.debug('reg: on', name, event, numCallbacks(name, event));
 };
 
 exports.once = function(name, event, listener) {
   if(!emitters[name]) { emitters[name] = new MicroEE(); }
   emitters[name].once(event, listener);
-  log.debug('reg: once', name, event, numCallbacks(name, event), emitters);
+  log.debug('reg: once', name, event, numCallbacks(name, event));
 };
 
 exports.when = function(name, event, listener) {
   if(!emitters[name]) { emitters[name] = new MicroEE(); }
   emitters[name].when(event, listener);
-  log.debug('reg: when', name, event, numCallbacks(name, event), emitters);
+  log.debug('reg: when', name, event, numCallbacks(name, event));
 };
 
 exports.removeListener = function(name, event, listener) {
-  log.debug('removeListener', name, event, numCallbacks(name, event), emitters);
+  log.debug('removeListener', name, event, numCallbacks(name, event));
   if(!emitters[name]) return this;
   emitters[name].removeListener(event, listener);
 };
 
 exports.removeAllListeners = function(name, event, listener) {
-  log.debug('removeAllListeners', name, event, numCallbacks(name, event), emitters);
+  log.debug('removeAllListeners', name, event, numCallbacks(name, event));
   if(!emitters[name]) return this;
   emitters[name].removeAllListeners(event, listener);
 };
@@ -521,7 +525,7 @@ function set(model, collectionClass, key, ids, results) {
     var current = model.get(key);
     // is it already a collection?
     if(current && current.add) {
-      log.info('Appending to existing collection', key, model, current);
+      log.info('Appending to existing collection', key, 'model id=' + model.id, ' collection cid=', current.cid);
       current.add(results);
     } else {
       // initialize
@@ -640,7 +644,7 @@ module.exports = function hydrate(name, models, onDone) {
     }
   }
   series(tasks.shift());
-}
+};
 },
 "microee": {"c":1,"m":"index.js"}};
 require.m[1] = {

@@ -125,7 +125,7 @@ exports.stream = function(name, conditions, onLoaded) {
 
 exports.sync = function(name) {
  return function(op, model, opts) {
-    log.info('sync', op, name+'='+model.get('id'), opts);
+    log.info('sync', op, name+'='+model.id, model, opts);
 
     // to hook up to the stream, bind on "create"
     if(op == 'create') {

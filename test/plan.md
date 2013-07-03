@@ -2,6 +2,7 @@
 
 - Test hydrating multiple rels for a single object
 - Test hydrating rels of rels
+- Test hydrating circular dependencies
 - Implement a .get() function that supports paths so that long chains of gets do not need a million checks
   - Ensure that if the field is type:string but empty, the result is an empty string
   - Ensure that if the field is type:object but empty, the result is ?? something with a getter?
