@@ -5,6 +5,25 @@ var assert = require('assert'),
 
 exports['test cache'] = {
 
+  'can initialize the cache from a json blob': function(done) {
+    done();
+  },
+
+  'can store() and get() a model': function(done) {
+    done();
+  },
+
+  'fetching a stored model gets from the cache': function(done) {
+
+  },
+
+  'fetching a model thats not available causes a external fetch': function(done) {
+
+  },
+
+  'storing an existing model causes it to be updated': function(done) {
+    done();
+  }
 };
 
 // if this module is the script being run, then run the tests:

@@ -7,7 +7,29 @@ var assert = require('assert'),
 
 require('minilog').enable();
 
-exports['test hydration'] = {
+exports['hydrate values...'] = {
+  'date string as date object': function() {
+
+  },
+
+  'empty date as a 1970\'s date object': function() {
+
+  },
+
+  'regexp string as regexp object': function() {
+
+  },
+
+  'empty regexp as regexp object': function() {
+
+  },
+
+  'hydrate a default value': function() {
+
+  }
+};
+
+exports['hydrate associations...'] = {
 
   before: function() {
     var self = this;
@@ -27,7 +49,7 @@ exports['test hydration'] = {
     cache._setAjax(ajax);
   },
 
-  'can hydrate a simple model': function(done) {
+  'a model with no associations': function(done) {
     mmm.hydrate('Comment', { text: 'foo' }, function(err, comment) {
       assert.ok(comment instanceof Model.Comment);
       assert.equal(comment.get('text'), 'foo');
@@ -35,7 +57,7 @@ exports['test hydration'] = {
     });
   },
 
-  'can hydrate an array of simple models': function(done) {
+  'an array of no-assoc models': function(done) {
     mmm.hydrate('Comment', [ { text: 'foo' }, { text: 'bar' } ], function(err, results) {
       assert.ok(Array.isArray(results));
       assert.ok(results[0] instanceof Model.Comment);
@@ -46,7 +68,7 @@ exports['test hydration'] = {
     });
   },
 
-  'can hydrate a model with a association': function(done) {
+  'a model with an association': function(done) {
     var self = this;
     mmm.hydrate('Post', {
         id: 1,
@@ -62,6 +84,18 @@ exports['test hydration'] = {
 
       done();
     });
+  },
+
+  'a model with two associations': function() {
+
+  },
+
+  'a model with an association that has a child association': function() {
+
+  },
+
+  'a model with a circular association': function() {
+
   },
 
   'if the model to be hydrated exists in cache, then update and reuse the cached model': function(done) {
@@ -85,19 +119,7 @@ exports['test hydration'] = {
 
       done();
     });
-  },
-
-  //'if the hydration is passed an instance of a model and new data ...'
-
-  'can hydrate a model with two associations': function() {
-
-
-  },
-
-  'can hydrate a model with a association that has a child association': function() {
-
   }
-
 };
 
 // if this module is the script being run, then run the tests:

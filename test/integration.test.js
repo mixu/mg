@@ -37,52 +37,52 @@ exports['given a simple model'] = {
     });
   },
 
-  'can hydrate a one-one relationship': function(done) {
-    mmm.findById('Post',1, function(err, val) {
-//      console.log(util.inspect(val, false, 10, true));
-      // check that the model id is correct
-      assert.equal(val.get('id'), 1);
-      // and the model contains a child model, author
-      assert.equal(val.get('author').get('name'), 'Bar');
+  'hydration': {
+    'can hydrate a one-one relationship': function(done) {
+      mmm.findById('Post',1, function(err, val) {
+  //      console.log(util.inspect(val, false, 10, true));
+        // check that the model id is correct
+        assert.equal(val.get('id'), 1);
+        // and the model contains a child model, author
+        assert.equal(val.get('author').get('name'), 'Bar');
+        done();
+      });
+    },
+
+    'can hydrate a one-many relationship to a array': function(done) {
+      // Post (id = 2) has many comments
+      mmm.findById('Post',2, function(err, val) {
+        assert.equal(val.get('id'), 2);
+        assert.equal(val.get('comments').at(0).get('name'), 'C-1');
+        assert.equal(val.get('comments').at(1).get('name'), 'C-2');
+  //      console.log(util.inspect(val, false, 10, true));
+        done();
+      });
+    },
+
+    'can hydrate a collection of individual models from a stream': function() {
+      var collection = mmm.stream('Post' , { }, function() {
+        // console.log(collection);
+      });
+    },
+
+    'can hydrate a collection of one-many relationship models from a stream': function() {
+
+    },
+
+    'when hydrating a collection of items and the collection is empty, do not create any models': function(done) {
+  //    mmm.stream('DataSource' , { }, function() {
       done();
-    });
+    }
   },
 
-  'can hydrate a one-many relationship to a array': function(done) {
-    // Post (id = 2) has many comments
-    mmm.findById('Post',2, function(err, val) {
-      assert.equal(val.get('id'), 2);
-      assert.equal(val.get('comments').at(0).get('name'), 'C-1');
-      assert.equal(val.get('comments').at(1).get('name'), 'C-2');
-//      console.log(util.inspect(val, false, 10, true));
-      done();
-    });
-  },
+  'find(..., [id1, id2], ...) should be interpreted as findById': function(done) {
 
-  'can hydrate a collection of individual models from a stream': function() {
-    var collection = mmm.stream('Post' , { }, function() {
-      // console.log(collection);
-    });
-  },
-
-  'can hydrate a collection of one-many relationship models from a stream': function() {
-
-  },
-
-  'when hydrating a collection of items and the collection is empty, do not create any models': function(done) {
-//    mmm.stream('DataSource' , { }, function() {
-    done();
   },
 
   'will wait properly for a pending request to complete rather than launching multiple requests': function(done) {
     done();
-  },
-
-
-  'can initialize the cache from a JSON-API structure': function(done) {
-    done();
   }
-
 };
 
 // if this module is the script being run, then run the tests:
