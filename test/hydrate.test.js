@@ -1,9 +1,11 @@
 var assert = require('assert'),
     util = require('util'),
     mmm = require('mmm'),
+    Backbone = require('backbone'),
     Model = require('./lib/models.js'),
     cache = require('../lib/cache.js'),
-    ajax = require('../lib/ajax.js');
+    ajax = require('../lib/ajax.js'),
+    fakeAjax = require('./lib/fake-ajax.js');
 
 require('minilog').enable();
 
@@ -34,15 +36,34 @@ exports['hydrate associations...'] = {
   before: function() {
     var self = this;
     this.ajaxCalls = [];
-    cache._setAjax(function(uri, callback) {
-      self.ajaxCalls.push([uri]);
-      if(uri == 'http://localhost:8721/people/1000') {
-        callback(null, {
-          id: 1000,
-          name: 'Bar'
-        });
+    cache._setAjax(fakeAjax({
+      people: [ { id: 1000, name: 'Bar' } ],
+      SimpleModel: [ 1, 2, 3 ].map(function(i) { return { id: i, name: 'Simple'+i }; }),
+      ModelWithChild: [ 1, 2, 3 ].map(function(i) { return { id: i, name: 'Child'+i }; }),
+      ModelWithGrandChild: [ 1, 2, 3 ].map(function(i) { return { id: i, name: 'GrandChild'+i }; })
+    }));
+
+    // Model definitions
+    var SimpleModel = Backbone.Model.extend({
+      sync: mmm.sync('SimpleModel')
+    });
+    mmm.define('SimpleModel', SimpleModel);
+
+    var ModelWithChild = Backbone.Model.extend({
+      sync: mmm.sync('ModelWithChild'),
+      rels: {
+        child: { type: 'SimpleModel' }
       }
     });
+    mmm.define('ModelWithChild', ModelWithChild);
+
+    var ModelWithGrandChild = Backbone.Model.extend({
+      sync: mmm.sync('ModelWithGrandChild'),
+      rels: {
+        child: { type: 'ModelWithChild' }
+      }
+    });
+    mmm.define('ModelWithGrandChild', ModelWithGrandChild);
   },
 
   after: function() {
@@ -87,14 +108,51 @@ exports['hydrate associations...'] = {
   },
 
   'a model with two associations': function() {
+    var AAA = Backbone.Model.extend({
+      sync: mmm.sync('AAA'),
+      rels: {
+        'first': { type: 'ModelWithChild' },
+        'second': { type: 'SimpleModel' }
+      }
+    });
+    mmm.define('AAA', AAA);
 
+    mmm.hydrate('AAA', {
+      name: 'AAA',
+      first: { id: 1 },
+      second: { id: 2 }
+    });
   },
 
   'a model with an association that has a child association': function() {
+    mmm.hydrate('ModelWithGrandChild', {
+      name: 'OP',
+      child: {
+        id: 1,
+        child: {
+          id: 2
+        }
+      }
+    });
 
   },
 
   'a model with a circular association': function() {
+    var FFF = Backbone.Model.extend({
+      sync: mmm.sync('FFF'),
+      rels: {
+        child: { type: 'GGG' }
+      }
+    });
+    mmm.define('FFF', FFF);
+    var GGG = Backbone.Model.extend({
+      sync: mmm.sync('GGG'),
+      rels: {
+        child: { type: 'FFF' }
+      }
+    });
+    mmm.define('GGG', GGG);
+
 
   },
 
