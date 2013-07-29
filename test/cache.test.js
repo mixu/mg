@@ -1,28 +1,39 @@
 var assert = require('assert'),
     util = require('util'),
     mmm = require('mmm'),
-    Model = require('./lib/models.js');
+    Model = require('./lib/models.js'),
+    cache = require('../lib/cache.js');
+
+require('minilog').enable();
 
 exports['test cache'] = {
 
-  'can initialize the cache from a json blob': function(done) {
+  'can initialize the cache from a json blob and get() an initialized value': function(done) {
     done();
   },
 
   'can store() and get() a model': function(done) {
-    done();
-  },
-
-  'fetching a stored model gets from the cache': function(done) {
-
+    var item = { id: 300, name: 'foo' };
+    cache.store('test', item);
+    cache.get('test', 300, function(err, result) {
+      assert.strictEqual(item, result);
+      done();
+    });
   },
 
   'fetching a model thats not available causes a external fetch': function(done) {
-
+    done();
   },
 
   'storing an existing model causes it to be updated': function(done) {
-    done();
+    var item = { id: 7000, name: 'foo' };
+    cache.store('test', item);
+    cache.store('test', { id: 7000, name: 'bar' });
+    cache.get('test', 7000, function(err, result) {
+      assert.strictEqual(item, result);
+      assert.equal(result.name, 'bar');
+      done();
+    });
   }
 };
 
