@@ -2,14 +2,27 @@ var assert = require('assert'),
     util = require('util'),
     mmm = require('mmm'),
     Model = require('./lib/models.js'),
-    cache = require('../lib/cache.js');
+    cache = require('../lib/cache.js'),
+    Backbone = require('backbone');
 
 require('minilog').enable();
 
 exports['test cache'] = {
 
   'can initialize the cache from a json blob and get() an initialized value': function(done) {
-    done();
+    var values = [
+      { id: 100, name: 'a' },
+      { id: 200, name: 'b' }
+    ];
+    cache.store('test', values);
+
+    cache.get('test', 100, function(err, result) {
+      assert.strictEqual(values[0], result);
+      cache.get('test', 200, function(err, result) {
+        assert.strictEqual(values[1], result);
+        done();
+      });
+    });
   },
 
   'can store() and get() a model': function(done) {
@@ -22,7 +35,19 @@ exports['test cache'] = {
   },
 
   'fetching a model thats not available causes a external fetch': function(done) {
-    done();
+    var ajax = require('../lib/ajax.js');
+    var test = Backbone.Model.extend({
+      sync: mmm.sync('test'), // really only needed for writing
+      url: 'http://localhost:7000/test/'
+    });
+    mmm.define('test', test);
+
+    cache._setAjax(function(uri, onDone) {
+      assert.equal('http://localhost:7000/test/9000', uri);
+      cache._setAjax(ajax);
+      done();
+    });
+    cache.get('test', 9000);
   },
 
   'storing an existing model causes it to be updated': function(done) {
