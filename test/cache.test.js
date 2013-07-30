@@ -50,6 +50,10 @@ exports['test cache'] = {
     cache.get('test', 9000);
   },
 
+  'if the external fetch is still pending, do not queue a second external fetch': function() {
+    assert.ok(false);
+  },
+
   'storing an existing model causes it to be updated': function(done) {
     var item = { id: 7000, name: 'foo' };
     cache.store('test', item);
