@@ -7,6 +7,32 @@ var assert = require('assert'),
     ajax = require('../lib/ajax.js'),
     fakeAjax = require('./lib/fake-ajax.js');
 
+// Model definitions
+var SimpleModel = Backbone.Model.extend({
+  url: 'http://test/SimpleModel',
+  sync: mmm.sync('SimpleModel')
+});
+mmm.define('SimpleModel', SimpleModel);
+
+var ModelWithChild = Backbone.Model.extend({
+  url: 'http://test/ModelWithChild',
+  sync: mmm.sync('ModelWithChild'),
+  rels: {
+    child: { type: 'SimpleModel' }
+  }
+});
+mmm.define('ModelWithChild', ModelWithChild);
+
+var ModelWithGrandChild = Backbone.Model.extend({
+  url: 'http://test/ModelWithGrandChild',
+  sync: mmm.sync('ModelWithGrandChild'),
+  rels: {
+    child: { type: 'ModelWithChild' }
+  }
+});
+mmm.define('ModelWithGrandChild', ModelWithGrandChild);
+
+
 require('minilog').enable();
 
 exports['hydrate values...'] = {
@@ -38,32 +64,18 @@ exports['hydrate associations...'] = {
     this.ajaxCalls = [];
     cache._setAjax(fakeAjax({
       people: [ { id: 1000, name: 'Bar' } ],
-      SimpleModel: [ 1, 2, 3 ].map(function(i) { return { id: i, name: 'Simple'+i }; }),
-      ModelWithChild: [ 1, 2, 3 ].map(function(i) { return { id: i, name: 'Child'+i }; }),
-      ModelWithGrandChild: [ 1, 2, 3 ].map(function(i) { return { id: i, name: 'GrandChild'+i }; })
+      SimpleModel: [ 1, 2, 3 ].map(function(i) {
+        return { id: i, name: 'Simple'+i };
+      }),
+      ModelWithChild: [ 1, 2, 3 ].map(function(i) {
+        return { id: i, name: 'Child'+i, child: i };
+      }),
+      ModelWithGrandChild: [ 1, 2, 3 ].map(function(i) {
+        return { id: i, name: 'GrandChild'+i, child: i };
+      }),
+      FFF: [ { id: 5000, name: 'FFF', child: 6000 }],
+      GGG: [ { id: 6000, name: 'GGG', parent: 5000 }]
     }));
-
-    // Model definitions
-    var SimpleModel = Backbone.Model.extend({
-      sync: mmm.sync('SimpleModel')
-    });
-    mmm.define('SimpleModel', SimpleModel);
-
-    var ModelWithChild = Backbone.Model.extend({
-      sync: mmm.sync('ModelWithChild'),
-      rels: {
-        child: { type: 'SimpleModel' }
-      }
-    });
-    mmm.define('ModelWithChild', ModelWithChild);
-
-    var ModelWithGrandChild = Backbone.Model.extend({
-      sync: mmm.sync('ModelWithGrandChild'),
-      rels: {
-        child: { type: 'ModelWithChild' }
-      }
-    });
-    mmm.define('ModelWithGrandChild', ModelWithGrandChild);
   },
 
   after: function() {
@@ -107,7 +119,7 @@ exports['hydrate associations...'] = {
     });
   },
 
-  'a model with two associations': function() {
+  'a model with two associations': function(done) {
     var AAA = Backbone.Model.extend({
       sync: mmm.sync('AAA'),
       rels: {
@@ -119,26 +131,44 @@ exports['hydrate associations...'] = {
 
     mmm.hydrate('AAA', {
       name: 'AAA',
-      first: { id: 1 },
-      second: { id: 2 }
+      first: 1,
+      second: 2
+    }, function(err, model) {
+      assert.equal('AAA', model.get('name'));
+      var first = model.get('first');
+      assert.ok(first instanceof ModelWithChild);
+      assert.equal(1, first.get('id'));
+      assert.equal('Child1', first.get('name'));
+      var second = model.get('second');
+      assert.ok(second instanceof SimpleModel);
+      assert.equal(2, second.get('id'));
+      assert.equal('Simple2', second.get('name'));
+      done();
     });
   },
 
-  'a model with an association that has a child association': function() {
+  'a model with an association that has a child association': function(done) {
     mmm.hydrate('ModelWithGrandChild', {
       name: 'OP',
-      child: {
-        id: 1,
-        child: {
-          id: 2
-        }
-      }
+      child: 1
+    }, function(err, model) {
+      assert.equal('OP', model.get('name'));
+      var current = model.get('child');
+      assert.ok(current instanceof ModelWithChild);
+      assert.equal(1, current.get('id'));
+      assert.equal('Child1', current.get('name'));
+      current = current.get('child');
+      assert.ok(current instanceof SimpleModel);
+      assert.ok(!(current instanceof ModelWithChild));
+      assert.equal(1, current.get('id'));
+      assert.equal('Simple1', current.get('name'));
+      done();
     });
-
   },
 
-  'a model with a circular association': function() {
+  'a model with a circular association': function(done) {
     var FFF = Backbone.Model.extend({
+      url: 'http://test/FFF/',
       sync: mmm.sync('FFF'),
       rels: {
         child: { type: 'GGG' }
@@ -146,14 +176,24 @@ exports['hydrate associations...'] = {
     });
     mmm.define('FFF', FFF);
     var GGG = Backbone.Model.extend({
+      url: 'http://test/GGG',
       sync: mmm.sync('GGG'),
       rels: {
-        child: { type: 'FFF' }
+        parent: { type: 'FFF' }
       }
     });
     mmm.define('GGG', GGG);
 
+    // cache.store('GGG', { id: 6000, name: 'GGG', parent: 5000 });
 
+    mmm.hydrate('FFF', { id: 5000, name: 'FFF', child: 6000 }, function(err, model) {
+      console.log('ONDONE');
+      console.log(util.inspect(model, null, 30, true));
+      assert.equal('FFF', model.get('name'));
+      var a = model.get('child');
+      assert.equal('GGG', a);
+      assert.strictEqual(model, model.get('child').get('parent'));
+    });
   },
 
   'if the model to be hydrated exists in cache, then update and reuse the cached model': function(done) {

@@ -20,8 +20,24 @@ build:
 		--main index.js \
 		--out dist/mmm.js
 
+case:
+
+	./node_modules/gluejs/bin/gluejs \
+		--basepath ./ \
+		--include ./lib \
+		--include ./index.js \
+		--include ./node_modules/microee \
+		--include ./node_modules/assert \
+		--exclude /tests/ \
+		--verbose \
+		--replace backbone=window.Backbone \
+		--replace minilog=window.Minilog \
+		--global mmm \
+		--main lib/case.js \
+		--out dist/case.js
+
 # disabled:
 #		--source-url \
 #		--nocommand 'uglifyjs --no-copyright' \
 
-.PHONY: test build
+.PHONY: test build case
