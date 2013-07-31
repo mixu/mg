@@ -9,6 +9,11 @@ require('minilog').enable();
 
 exports['test cache'] = {
 
+  after: function() {
+    var ajax = require('../lib/ajax.js');
+    cache._setAjax(ajax);
+  },
+
   'can initialize the cache from a json blob and get() an initialized value': function(done) {
     var values = [
       { id: 100, name: 'a' },
@@ -35,7 +40,6 @@ exports['test cache'] = {
   },
 
   'fetching a model thats not available causes a external fetch': function(done) {
-    var ajax = require('../lib/ajax.js');
     var test = Backbone.Model.extend({
       sync: mmm.sync('test'), // really only needed for writing
       url: 'http://localhost:7000/test/'
@@ -44,14 +48,36 @@ exports['test cache'] = {
 
     cache._setAjax(function(uri, onDone) {
       assert.equal('http://localhost:7000/test/9000', uri);
-      cache._setAjax(ajax);
+      onDone(null, { id: 7000});
       done();
     });
     cache.get('test', 9000);
   },
 
-  'if the external fetch is still pending, do not queue a second external fetch': function() {
-    assert.ok(false);
+  'if the external fetch is still pending, do not queue a second external fetch': function(done) {
+    var calls = 0,
+        resultCalls = 0;
+    cache._setAjax(function(uri, onDone) {
+      calls++;
+      if(calls == 1) {
+        setTimeout(function() {
+          onDone(null, { id: 7000, name: 'ok' });
+        }, 10);
+      } else {
+        assert.ok(false, 'Should not be called twice since still pending');
+      }
+    });
+    function results(err, value) {
+      resultCalls++;
+      if(resultCalls == 2) {
+        assert.equal(resultCalls, 2);
+        assert.equal(err, null);
+        assert.equal(value.name, 'ok');
+        done();
+      }
+    }
+    cache.get('test', 7000, results);
+    cache.get('test', 7000, results);
   },
 
   'storing an existing model causes it to be updated': function(done) {

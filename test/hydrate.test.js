@@ -212,7 +212,7 @@ exports['hydrate associations...'] = {
           name: 'Foo',
           author: 1000
         }, function(err, val) {
-        console.log(val);
+        // console.log(val);
         assert.ok(val instanceof Model.Post);
         // check that the model id is correct
         assert.equal(val.get('id'), 1);
