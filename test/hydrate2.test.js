@@ -40,6 +40,7 @@ exports['hydrate associations...'] = {
     var self = this;
     this.ajaxCalls = [];
     cache._setAjax(fakeAjax({
+      posts: [ { id: 1, name: 'Posts1' } ],
       people: [ { id: 1000, name: 'Bar' } ],
       SimpleModel: [ 1, 2, 3 ].map(function(i) {
         return { id: i, name: 'Simple'+i };
@@ -171,7 +172,120 @@ exports['hydrate associations...'] = {
         assert.equal(comment.get('text'), 'foo');
         done();
       });
-    }
+    },
+
+    'an array of no-assoc models': function(done) {
+      this.h.hydrate('Comment', [ { text: 'foo' }, { text: 'bar' } ], function(err, results) {
+        assert.ok(Array.isArray(results));
+        assert.ok(results[0] instanceof Model.Comment);
+        assert.equal(results[0].get('text'), 'foo');
+        assert.ok(results[1] instanceof Model.Comment);
+        assert.equal(results[1].get('text'), 'bar');
+        done();
+      });
+    },
+
+    // TODO: test where the data is locally available and cache returns a 404
+
+    'a model with an association': function(done) {
+      var self = this;
+      this.h.hydrate('Post', {
+          id: 1,
+          name: 'Foo',
+          author: 1000
+        }, function(err, val) {
+        console.log(val);
+        assert.ok(val instanceof Model.Post);
+        // check that the model id is correct
+        assert.equal(val.get('id'), 1);
+        assert.equal(val.get('name'), 'Foo');
+        // and the model contains a child model, author
+        assert.ok(val.get('author') instanceof Model.Person);
+        assert.equal(val.get('author').get('name'), 'Bar');
+
+        self.postInstance = val;
+
+        done();
+      });
+    },
+
+    'a model with two associations': function(done) {
+      var AAA = Backbone.Model.extend({
+        sync: mmm.sync('AAA'),
+        rels: {
+          'first': { type: 'ModelWithChild' },
+          'second': { type: 'SimpleModel' }
+        }
+      });
+      mmm.define('AAA', AAA);
+
+      this.h.hydrate('AAA', {
+        name: 'AAA',
+        first: 1,
+        second: 2
+      }, function(err, model) {
+        assert.equal('AAA', model.get('name'));
+        var first = model.get('first');
+        assert.ok(first instanceof ModelWithChild);
+        assert.equal(1, first.get('id'));
+        assert.equal('Child1', first.get('name'));
+        var second = model.get('second');
+        assert.ok(second instanceof SimpleModel);
+        assert.equal(2, second.get('id'));
+        assert.equal('Simple2', second.get('name'));
+        done();
+      });
+    },
+
+    'a model with an association that has a child association': function(done) {
+      this.h.hydrate('ModelWithGrandChild', {
+        name: 'OP',
+        child: 1
+      }, function(err, model) {
+        assert.equal('OP', model.get('name'));
+        var current = model.get('child');
+        assert.ok(current instanceof ModelWithChild);
+        assert.equal(1, current.get('id'));
+        assert.equal('Child1', current.get('name'));
+        current = current.get('child');
+        assert.ok(current instanceof SimpleModel);
+        assert.ok(!(current instanceof ModelWithChild));
+        assert.equal(1, current.get('id'));
+        assert.equal('Simple1', current.get('name'));
+        done();
+      });
+    },
+
+    'a model with a circular association': function(done) {
+      var FFF = Backbone.Model.extend({
+        url: 'http://test/FFF/',
+        sync: mmm.sync('FFF'),
+        rels: {
+          child: { type: 'GGG' }
+        }
+      });
+      mmm.define('FFF', FFF);
+      var GGG = Backbone.Model.extend({
+        url: 'http://test/GGG',
+        sync: mmm.sync('GGG'),
+        rels: {
+          parent: { type: 'FFF' }
+        }
+      });
+      mmm.define('GGG', GGG);
+
+      cache.store('GGG', { id: 6000, name: 'GGG', parent: 5000 });
+
+      this.h.hydrate('FFF', { id: 5000, name: 'FFF', child: 6000 }, function(err, model) {
+        // console.log(util.inspect(model, null, 30, true));
+        assert.equal('FFF', model.get('name'));
+        var a = model.get('child');
+        assert.equal('GGG', a.get('name'));
+        assert.strictEqual(model, model.get('child').get('parent'));
+        done();
+      });
+    },
+
   }
 };
 
