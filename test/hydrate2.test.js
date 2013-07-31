@@ -90,6 +90,44 @@ exports['hydrate associations...'] = {
       );
     },
 
+    'rel is undefined, null or empty string': function() {
+      assert.deepEqual(
+        { ModelWithChild: { 1000: true } },
+        this.h.getTasks('ModelWithChild', { id: 1000 })
+      );
+      assert.deepEqual(
+        { ModelWithChild: { 1000: true } },
+        this.h.getTasks('ModelWithChild', { id: 1000, child: undefined })
+      );
+      assert.deepEqual(
+        { ModelWithChild: { 1000: true } },
+        this.h.getTasks('ModelWithChild', { id: 1000, child: null })
+      );
+      assert.deepEqual(
+        { ModelWithChild: { 1000: true } },
+        this.h.getTasks('ModelWithChild', { id: 1000, child: '' })
+      );
+    },
+
+    'base model id is undefined, null or empty string': function() {
+      assert.deepEqual(
+        { },
+        this.h.getTasks('SimpleModel', { })
+      );
+      assert.deepEqual(
+        { },
+        this.h.getTasks('SimpleModel', { id: undefined })
+      );
+      assert.deepEqual(
+        { },
+        this.h.getTasks('SimpleModel', { id: null })
+      );
+      assert.deepEqual(
+        { },
+        this.h.getTasks('SimpleModel', { id: '' })
+      );
+    },
+
     'rel is a Model instance': function() {
       assert.deepEqual(
         { ModelWithChild: { 1000: true }, SimpleModel: { '123': true } },
