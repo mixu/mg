@@ -286,6 +286,29 @@ exports['hydrate associations...'] = {
       });
     },
 
+    'if the model to be hydrated exists in cache, then update and reuse the cached model': function(done) {
+      var self = this;
+      this.ajaxCalls = [];
+      this.h.hydrate('Post', {
+          id: 1,
+          name: 'New post',
+          author: 1000
+        }, function(err, val) {
+        // assert that no ajax calls were made
+        assert.equal(self.ajaxCalls.length, 0);
+
+        // assert that the instance was reused
+        assert.strictEqual(val,  self.postInstance);
+        // with updated value
+        assert.equal(val.get('name'), 'New post');
+        // and the rest of the data is like before
+        assert.equal(val.get('id'), 1);
+        assert.equal(val.get('author').get('name'), 'Bar');
+
+        done();
+      });
+    }
+
   }
 };
 
