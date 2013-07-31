@@ -7,7 +7,7 @@ var assert = require('assert'),
     ajax = require('../lib/ajax.js'),
     fakeAjax = require('./lib/fake-ajax.js');
 
-// require('minilog').enable();
+require('minilog').enable();
 
 // Model definitions
 var SimpleModel = Backbone.Model.extend({
@@ -59,11 +59,11 @@ exports['hydrate associations...'] = {
     cache._setAjax(ajax);
   },
 
-  'deps': {
+  beforeEach: function() {
+    this.h = new mmm.hydrate2();
+  },
 
-    beforeEach: function() {
-      this.h = new mmm.hydrate2();
-    },
+  'deps': {
 
     'simple': function() {
       assert.deepEqual(
@@ -112,21 +112,29 @@ exports['hydrate associations...'] = {
   },
 
   'cannot add a duplicate task to the queue': function() {
-
+    assert.ok(this.h.add('test', 1));
+    assert.ok(!this.h.add('test', 1));
   },
 
   'can fetch and store an item into the interim cache': function() {
-
+    assert.ok(this.h.add('SimpleModel', 1));
+    this.h.next(function() {
+    });
   },
 
   'given the interim cache, can link the items together': function() {
 
   },
 
-  'when the run queue is empty and all tasks have finished, the next task is link and return': function() {
-
+  'hydrate': {
+    'a model with no associations': function(done) {
+      this.h.hydrate('Comment', { text: 'foo' }, function(err, comment) {
+        assert.ok(comment instanceof Model.Comment);
+        assert.equal(comment.get('text'), 'foo');
+        done();
+      });
+    }
   }
-
 };
 
 // if this module is the script being run, then run the tests:
