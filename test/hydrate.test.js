@@ -236,6 +236,18 @@ exports['hydrate associations...'] = {
       });
     },
 
+    'hydrating a empty array should return a collection': function(done) {
+      cache.store('Post', { id: 1000 });
+
+      mmm.hydrate('Post', { id: 1000, author: [] }, function(err, val) {
+        assert.ok(val instanceof Model.Post);
+        assert.equal(val.get('id'), 1000);
+        assert.ok(val.get('author') instanceof Backbone.Collection);
+        assert.equal(val.get('author').length, 0);
+        done();
+      });
+    },
+
     'a model with two associations': function(done) {
       var AAA = Backbone.Model.extend({
         sync: mmm.sync('AAA'),

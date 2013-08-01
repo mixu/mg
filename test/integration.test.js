@@ -7,7 +7,7 @@ var assert = require('assert'),
     Backbone = require('backbone'),
     cache = require('../lib/cache.js');
 
-require('minilog').suggest.deny(/mmm/, 'info');
+//require('minilog').suggest.deny(/mmm/, 'info');
 require('minilog').enable();
 
 exports['given a simple model'] = {
@@ -96,10 +96,6 @@ exports['given a simple model'] = {
       assert.ok(val[1] instanceof Post);
       done();
     });
-  },
-
-  'will wait properly for a pending request to complete rather than launching multiple requests': function(done) {
-    done();
   }
 };
 

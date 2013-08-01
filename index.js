@@ -35,7 +35,10 @@ function listRemote(name, onDone) {
   if(!uri) {
     console.error('Unknown mmm.stream URL: ' +name);
   }
-  cache.fetch(name, uri, onDone);
+  cache.fetch(name, uri, function(err, data) {
+    // apply hydration to the remote items
+    hydrate(name, data, onDone);
+  });
 }
 
 function listBoth(name, onDone) {
@@ -92,7 +95,9 @@ exports.stream = function(name, conditions, onLoaded) {
   // start the find
   exports.find(name, { since: 0 }, function(err, results) {
     // add the results to the collection
-    instance.add(results);
+    if(results) {
+      instance.add(results);
+    }
 
     onLoaded && onLoaded(null, instance);
 
@@ -108,7 +113,7 @@ exports.stream = function(name, conditions, onLoaded) {
     // subscribe to local "on-fetch-or-save" (with filter)
     // if remote subscription is supported, do that as well
     Stream.on(name, 'available', function(model) {
-      log.info('mmm.stream.available', model.id, model.get('name'));
+      log.info('mmm.stream available', model.id, model.get('name'));
       instance.add(model);
     });
   });
