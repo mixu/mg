@@ -25,6 +25,7 @@ if(typeof window == 'undefined') {
 // Define a correspondence between a name and a Model class (and metadata)
 exports.define = meta.define;
 exports.hydrate = hydrate;
+exports.hydrate2 = hydrate.hydrate2;
 
 // Query API
 
@@ -35,18 +36,15 @@ function listLocal(name, onDone) {
 }
 
 function listRemote(name, onDone) {
-  log.info('listRemote', name);
-  if(name == 'DataSource') {
-    cache.fetch(name, '/v1/datasources', onDone);
-  } else if(name == 'Project') {
-    cache.fetch(name, '/v1/projects', onDone);
-  } else if(name == 'Post') {
-    cache.fetch(name, '/v1/post', onDone);
-  } else if(name == 'Job') {
-    cache.fetch(name, '/v1/jobs', onDone);
-  } else {
-    console.error('Unknown mmm.stream name');
+  var uri = cache.uri(name);
+  log.info('listRemote', name, uri);
+  if(!uri) {
+    console.error('Unknown mmm.stream URL: ' +name);
   }
+  cache.fetch(name, uri, function(err, data) {
+    // apply hydration to the remote items
+    hydrate(name, data, onDone);
+  });
 }
 
 function listBoth(name, onDone) {
@@ -68,10 +66,9 @@ exports.find = function(name, conditions, onDone) {
   }
   if(conditions.id) {
     // get by id
-    return cache.get(name, conditions.id, function(err, result) {
+    return hydrate(name, { id: conditions.id }, function(err, result) {
       if(err) return onDone(err);
       if(result) {
-        // cache returns hydrated results
         onDone(null, result);
       }
     });
@@ -95,7 +92,7 @@ exports.findOne = function(name, conditions, onDone) {
 
 // return a single model by id
 exports.findById = function(name, id, onDone) {
-  return exports.findOne(name, { id: id }, onDone);
+  return hydrate(name, id, onDone);
 };
 
 // returns a pipeable stream
@@ -104,9 +101,11 @@ exports.stream = function(name, conditions, onLoaded) {
   // start the find
   exports.find(name, { since: 0 }, function(err, results) {
     // add the results to the collection
-    instance.add(results);
+    if(results) {
+      instance.add(results);
+    }
 
-    onLoaded && onLoaded();
+    onLoaded && onLoaded(null, instance);
 
     Stream.on(name, 'destroy', function(model) {
         log.info('mmm.stream remove collection', instance.id, model.id);
@@ -120,7 +119,7 @@ exports.stream = function(name, conditions, onLoaded) {
     // subscribe to local "on-fetch-or-save" (with filter)
     // if remote subscription is supported, do that as well
     Stream.on(name, 'available', function(model) {
-      log.info('mmm.stream.available', model.id, model.get('name'));
+      log.info('mmm.stream available', model.id, model.get('name'));
       instance.add(model);
     });
   });
@@ -240,10 +239,14 @@ module.exports = (typeof window == 'undefined' ? fetch : ajaxFetch);
 },
 "lib/meta.js": function(module, exports, require){
 var log = require('minilog')('mmm/meta'),
-    Backbone = require('backbone');
+    Collection = require('backbone').Collection;
 
 var meta = {},
     model = {};
+
+if(typeof window != 'undefined' && window.Cato) {
+  Collection.prototype.pipe = Cato.Collection.prototype.pipe;
+}
 
 // fetch the key value as-is
 exports.get = function(name, key) {
@@ -274,7 +277,7 @@ exports.collection = function(name) {
   var collection = exports.get(name, 'collection');
   if(!collection) {
     console.log(name + ' does not have a `.collection` property.');
-    return Backbone.Collection;
+    return Collection;
   }
   return exports.model(collection);
 };
@@ -301,14 +304,40 @@ exports.define = function(name, mmeta) {
 };
 
 },
+"lib/util.js": function(module, exports, require){
+// call getter if it exists, otherwise return property
+exports.get = function(obj, key) {
+  if(!obj) return '';
+  if(typeof obj.get == 'function') {
+    return obj.get(key);
+  } else {
+    return obj[key];
+  }
+};
+
+// call setter if exists, otherwise set property
+exports.set = function(obj, key, value) {
+  if(typeof obj.set == 'function') {
+    return obj.set(key, value);
+  } else {
+    obj[key] = value;
+  }
+};
+
+// calls .keys() if exists, otherwise does Object.keys()
+exports.keys = function(obj) {
+  return (typeof obj.keys == 'function' ? obj.keys() : Object.keys(obj));
+};
+},
 "lib/cache.js": function(module, exports, require){
 var Stream = require('./stream.js'),
-    hydrate = require('./hydrate.js'),
     ajax = require('./ajax.js'),
     meta = require('./meta.js'),
+    util = require('./util.js'),
     log = require('minilog')('mmm/cache');
 
-var cache = {};
+var cache = {},
+    callbacks = {};
 
 // returns an plain array (multiple items) or a plain object (single item)
 function unwrapJSONAPI(name, data) {
@@ -357,7 +386,7 @@ exports.get = function get(name, id, onDone) {
 exports.uri = function(name, id) {
 // assume url + id for get by Id
   var base = meta.result(name, 'url'),
-      uri = base + (base.charAt(base.length - 1) === '/' ? '' : '/') + encodeURIComponent(id);
+      uri = base + (base.charAt(base.length - 1) === '/' ? '' : '/') + (id ? encodeURIComponent(id) : '');
   return uri;
 };
 
@@ -373,16 +402,20 @@ exports.store = function(name, values) {
     Stream.onFetch(name, value);
 
     if(value && value.id) {
-      log.debug('Storing fetch result in cache', name, value.id);
       if(cache[name][value.id]) {
-        log.error('Skipping - already cached! ', name, value.id);
-        // should update the cache in a way that doesn't invalidate,
-        // or better yet, fix in upstream so that we don't try to hydrate things that exist
+        log.debug('Updating values', name, value.id);
+        // update the stored values, but do not change the object instance
+        util.keys(value).forEach(function(key) {
+          // console.log('set', key, util.get(value, key));
+          util.set(cache[name][value.id], key, util.get(value, key));
+        });
         return;
+      } else {
+        log.debug('Caching first time', name, value.id);
+        cache[name][value.id] = value;
       }
-      cache[name][value.id] = value;
     } else {
-      log.error('Unknown cache.store value', value);
+      log.warn('Cannot cache model without an id', value);
     }
   });
 };
@@ -391,35 +424,49 @@ exports.store = function(name, values) {
 // Mirrors the ajax.fetch function -- but does all the additional work
 // of unwrapping, hydrating and cache-storing content
 exports.fetch = function(name, uri, onDone) {
-  log.debug('ajax fetch to '+uri);
-  ajax(uri, function(err, data) {
-    if(err) return onDone(err, null);
-
-    // the data can be empty (e.g. nothing to hydrate)
-    if(!data || Array.isArray(data) && data.length == 0) {
-      log.debug('ajax empty onDone '+uri, data);
-     return onDone(null, data);
-    }
-
-    // Order:
-    // 1. unwrap
-    // 2. hydrate (all items)
-    hydrate(name, unwrap(name, data), function(err, values) {
-      if(err) {
-        return onDone(err, null);
-      }
-      // 3. store in cache
-      exports.store(name, values);
-
-      // 4. pass back
-      log.debug('ajax fetch onDone '+uri);
-      onDone(null, values);
+  var isPending = !(typeof callbacks[uri] == 'undefined');
+  if(!callbacks[uri]) {
+    callbacks[uri] = [];
+  }
+  if(onDone) {
+    callbacks[uri].push(onDone);
+  }
+  function emit(err, result) {
+    if(!callbacks[uri]) return;
+    callbacks[uri].forEach(function(onDone) {
+      onDone(err, result);
     });
-  });
+    delete callbacks[uri];
+  }
+
+  if(!isPending) {
+    log.debug('ajax fetch to '+uri);
+    ajax(uri, function(err, data) {
+        if(err) return emit(err, null);
+        // the data can be empty (e.g. nothing to hydrate)
+        if(!data || Array.isArray(data) && data.length == 0) {
+          log.debug('ajax empty onDone '+uri, data);
+          return emit(null, data);
+        }
+
+        // unwrap and pass back
+        // Note: previously we called hydrate implicitly, but I think it is preferable
+        // to have cache fetches be dumb and use the hydration as the
+        // interface for queuing and running fetch jobs
+        log.debug('ajax fetch onDone '+uri);
+        emit(null, unwrap(name, data));
+      });
+  } else {
+    log.debug('ajax queue for '+uri);
+  }
 };
 
 exports._setAjax = function(obj) {
   ajax = obj;
+};
+
+exports.clear = function() {
+  cache = {};
 };
 },
 "lib/stream.js": function(module, exports, require){
@@ -449,7 +496,7 @@ function numCallbacks(name, event) {
 // each model has to be created for it to generate any events
 // this is called on create; the stream should then attach to the relevant events
 exports.bind = function(name, source) {
-
+  log.debug('bind', name, source.id);
   function onChange(model, options) {
     log.debug('change', name, model.id, numCallbacks(name, 'change'));
     emitters[name].emit('change', model);
@@ -463,8 +510,10 @@ exports.bind = function(name, source) {
     emitters[name].removeAllListeners('destroy', model);
   }
 
-  source.on('change', onChange);
-  source.on('destroy', onDestroy);
+  if(source.on) {
+    source.on('change', onChange);
+    source.on('destroy', onDestroy);
+  }
 };
 
 // all tracked models originate on the server.
@@ -512,138 +561,331 @@ exports.removeAllListeners = function(name, event, listener) {
 "lib/hydrate.js": function(module, exports, require){
 var cache = require('./cache.js'),
     meta = require('./meta.js'),
+    util = require('./util.js'),
     Collection = require('backbone').Collection,
     log = require('minilog')('mmm/hydration');
 
-if(typeof window != 'undefined' && window.Cato) {
-  Collection.prototype.pipe = Cato.Collection.prototype.pipe;
-}
-
-function set(model, collectionClass, key, ids, results) {
-  // if the original wrapper was an array, then we need to wrap this item in a collection
-  if(Array.isArray(ids)) {
-    var current = model.get(key);
-    // is it already a collection?
-    if(current && current.add) {
-      log.info('Appending to existing collection', key, 'model id=' + model.id, ' collection cid=', current.cid);
-      current.add(results);
-    } else {
-      // initialize
-      log.info('Initializing collection during hydration', key, model, results);
-      model.set(key, new collectionClass(results));
-    }
-  } else {
-    // otherwise, it's a singular property
-    model.set(key, (results.length == 1 ? results[0] : results));
-  }
-}
-
-// given a fetched object, populate any refs to foreign models in it
-// and call the callback
 module.exports = function hydrate(name, models, onDone) {
-  var tasks = [],
-      waiting = 0,
-      rels = meta.get(name, 'rels'),
-      lastError = null,
-      modelClass = meta.model(name),
-      // need to return a non-array for single result
-      isArray = Array.isArray(models);
-  // support both arrays and individual models
-  if(!isArray) {
-    models = [ models ];
-  }
+  var h = new Hydration();
+  h.hydrate(name, models, onDone);
+};
 
-  models.forEach(function(model, index) {
-    log.info('Hydrating '+ name, model.id, model, rels);
+module.exports.hydrate2 = Hydration;
 
-    // hydration can instantiate the model in necessary
-    if(!(model instanceof modelClass)) {
-      log.info('Not an instance of '+name+', instantiating model.');
-      model = models[index] = new modelClass(model);
+function forEachRelationValue(name, model, eachFn) {
+  // get rels for the current model
+  var rels = meta.get(name, 'rels');
+  // shortcut if no rels to consider
+  if(!rels) return;
+  // for each key-value pair, run the eachFn
+  Object.keys(rels).forEach(function(key) {
+    // is a value set that needs to be hydrated?
+    var ids = util.get(model, key),
+        relType = rels[key].type;
+
+    // if the value is a Collection, use the models property
+    if(ids instanceof Collection) {
+      ids = ids.models;
     }
-
-    // skip to next without queuing task if no rels
-    if(!rels) return;
-
-    // for each hydration task, there is an array of relation keys to fill in
-    Object.keys(rels).forEach(function(key) {
-      // is a value set that needs to be hydrated?
-      var ids = model.get(key),
-          modelName = rels[key].type;
-
-      log.debug(name + '.'+key +' hydration check: ', ids, typeof ids);
-
-
-      // the value may be one of:
-      // 1. a string or number representing a single id
-      // 2. an array of strings or ids
-      // 3. a collection
-      if(ids instanceof Collection) {
-        log.warn('Attempted to hydrate a Collection:', ids);
-        ids = ids.models;
-      }
-      // for empty collections, we still need to do the initialization bit
-      // so might as well always do it.
-      // Otherwise: some models will have properties that are not collections when they should be.
-      if(Array.isArray(ids)) {
-        var current = model.get(key);
-        if(!current || !current.add) {
-          log.info('Initializing collection during hydration', key);
-          model.set(key, new (meta.collection(modelName))());
-        }
-      }
-
-      // the value may be empty if there are no ids
-      if(!ids) {
-        return;
-      }
-
-      (Array.isArray(ids) ? ids : [ ids ]).forEach(function(id) {
-        // acceptable values are numbers, strings and arrays of numbers and strings
-        if(typeof id != 'number' && typeof id != 'string') {
-          return;
-        }
-
-        log.info('Queue hydration for:', modelName, id);
-
-        // else queue up the task to fetch the related model
-        tasks.push(function(done) {
-          // can we fetch the value to hydrate locally? if so, we're done with this
-          var value = cache.local(modelName, id);
-          if(value) {
-            log.info('Hydrating from local cache', modelName, id);
-            set(model, meta.collection(modelName), key, ids, value);
-            return done();
-          }
-          cache.get(modelName, id, function(err, results) {
-            if(err) {
-              if(err == 404) {
-                log.warn('Skip hydration for:', modelName, id, 'due to 404.');
-                return done();
-              }
-              lastError = err;
-            }
-
-            log.info('Complete hydration for:', modelName, id);
-            // set value
-            set(model, meta.collection(modelName), key, ids, results);
-            done();
-          })
-        });
-      });
+    // no tasks if ids is not set
+    if(!ids) {
+      return;
+    }
+    (Array.isArray(ids) ? ids : [ ids ]).forEach(function(id) {
+      eachFn(key, relType, id);
     });
   });
+}
 
-  function series(task) {
-    if(task) {
-      task(function(result) {
-        return series(tasks.shift());
+function Hydration() {
+  // list of tasks by model and id;
+  // prevents circular dependencies from being processed
+  this.seenTasks = {};
+  // intermediate model cache (until we have exhaustively fetched all model-id combos)
+  this.cache = {};
+  // task queue
+  this.queue = [];
+  // input cache
+  this.inputCache = {};
+}
+
+// can this task be queued? Prevent circular deps.
+Hydration.prototype.canQueue = function(name, id) {
+  return !(this.seenTasks[name] && this.seenTasks[name][id]);
+};
+
+// given model data, return the tasks
+Hydration.prototype.getTasks = function(name, model) {
+  var result = {};
+
+  // the current model is a task if it has an id
+  if(model.id != null && model.id !== '') {
+    if(!result[name]) {
+      result[name] = {};
+    }
+    log.info('Queue hydration for:', name, model.id);
+    result[name][model.id] = true;
+  }
+  forEachRelationValue(name, model, function(key, relType, id) {
+    if(!result[relType]) {
+      result[relType] = {};
+    }
+    // items may be either numbers, strings or models
+    switch(typeof id) {
+      case 'number':
+      case 'string':
+        log.info('Queue hydration for:', relType, id);
+        result[relType][id] = true;
+        break;
+      case 'object':
+        // model.id
+        if(id.id) {
+          log.info('Queue hydration for:', relType, id.id);
+          result[relType][id.id] = true;
+        }
+    }
+  });
+
+  return result;
+};
+
+// add an element to a queue
+Hydration.prototype.add = function(name, id) {
+  if(!this.canQueue(name, id)) {
+    return false;
+  }
+  if(!this.seenTasks[name]) {
+    this.seenTasks[name] = {};
+  }
+  log.info('Add fetch:', name, id);
+  this.seenTasks[name][id] = true;
+  this.queue.push({ name: name, id: id });
+  return true;
+};
+
+// run the next fetch, merge with the input cache,
+// discover dependcies and update the queue
+Hydration.prototype.next = function(done) {
+  var self = this,
+      task = this.queue.shift();
+  if(!task) return done();
+  var name = task.name,
+      id = task.id;
+
+  cache.get(name, id, function(err, result) {
+    if(err) {
+      if(err == 404) {
+        log.warn('Skip hydration for:', name, id, 'due to 404.');
+        return done();
+      }
+    }
+    log.info('Intermediate cache:', name, id);
+    // merge with inputcache
+    if(self.inputCache[name] && self.inputCache[name][id]) {
+      // override values in the cached instance with values from the root model
+      var input = self.inputCache[name][id],
+          keys = util.keys(input);
+      keys.forEach(function(key) {
+        util.set(result, key, util.get(input, key));
       });
+    }
+    if(!self.cache[name]) {
+      self.cache[name] = {};
+    }
+    // store into intermediate cache
+    self.cache[name][id] = result;
+
+    // discover dependencies of this model
+    var deps = self.getTasks(name, result);
+    // add each dependency into the queue
+    Object.keys(deps).forEach(function(name) {
+      Object.keys(deps[name]).forEach(function(id) {
+        self.add(name, id);
+      });
+    });
+    done();
+  });
+};
+
+// link a single model to its dependencies
+Hydration.prototype.linkRel = function(name, instance) {
+  var self = this;
+   // check it's rels, and store the appropriate link
+  var rels = meta.get(name, 'rels');
+  log.info('LinkRels', name, instance.id, rels);
+  // shortcut if no rels to consider
+  if(!rels) return instance;
+  // for each key-value pair, run the eachFn
+  Object.keys(rels).forEach(function(key) {
+    // is a value set that needs to be hydrated?
+    var ids = util.get(instance, key),
+        value = util.get(instance, key),
+        isCollection = (value && value.add),
+        relType = rels[key].type;
+
+    // if the value is a Collection, use the models property
+    if(ids instanceof Collection) {
+      ids = ids.models;
+    }
+
+    // This check must run independently of whether ids is empty
+    // so that arrays are converted into collections
+    if(Array.isArray(value) && !isCollection) {
+      log.info('Initializing collection during hydration', key);
+      value = new (meta.collection(relType))();
+      util.set(instance, key, value);
+      isCollection = true;
+    }
+
+    // no tasks if ids is not set
+    if(!ids) {
+      return;
+    }
+    (Array.isArray(ids) ? ids : [ ids ]).forEach(function(modelId) {
+      // items may be either numbers, strings or models
+      switch(typeof modelId) {
+        case 'number':
+        case 'string':
+          log.info('Link', key, 'to', relType, modelId);
+          if(isCollection) {
+            value.add(self.cache[relType][modelId]);
+          } else {
+            util.set(instance, key, self.cache[relType][modelId]);
+          }
+          break;
+        case 'object':
+          // model.id
+          if(modelId.id) {
+            log.info('Link', key, 'to', relType, modelId.id);
+            if(isCollection) {
+              value.add(self.cache[relType][modelId.id]);
+            } else {
+              util.set(instance, key, self.cache[relType][modelId.id]);
+            }
+          }
+      }
+    });
+  });
+  return instance;
+};
+
+Hydration.prototype.link = function(name, model) {
+  var self = this;
+  // all models must be instantiated first
+  Object.keys(self.cache).forEach(function(name) {
+    Object.keys(self.cache[name]).forEach(function(id) {
+      var modelClass = meta.model(name);
+      // instantiate the model if necessary
+      if(!(self.cache[name][id] instanceof modelClass)) {
+        // log.info('Not an instance of '+name+', instantiating model.');
+        self.cache[name][id] = new modelClass(self.cache[name][id]);
+      }
+    });
+  });
+  // iterate each model in the cache
+  Object.keys(self.cache).forEach(function(name) {
+    Object.keys(self.cache[name]).forEach(function(id) {
+      // link the rels
+      self.cache[name][id] = self.linkRel(name, self.cache[name][id]);
+      // update the model cache with the new model
+      cache.store(name, self.cache[name][id]);
+    });
+  });
+  // return root
+  if(model.id) {
+    // if the model has an id, just use the cached version
+    var result = this.cache[name][model.id];
+    cache.store(name, result);
+    return result;
+  } else {
+    var modelClass = meta.model(name);
+    // link in any rels
+    model = self.linkRel(name, model);
+    // instantiate the root model (needed because not part
+    // of the intermediate cache so never instantiated)
+    if(!(model instanceof modelClass)) {
+      model = new modelClass(model);
+    }
+    // no point in caching this, since it doesn't have an id
+    return model;
+  }
+};
+
+Hydration.prototype.flatten = function(name, model) {
+  var self = this;
+  if(model.id) {
+    if(!this.inputCache[name]) {
+      this.inputCache[name] = {};
+    }
+    this.inputCache[name][model.id] = model;
+  }
+
+  forEachRelationValue(name, model, function(key, relType, model) {
+      // items may be either numbers, strings or models
+      switch(typeof model) {
+        case 'object':
+          // model.id
+          if(model.id) {
+            if(!self.inputCache[relType]) {
+              self.inputCache[relType] = {};
+            }
+            self.inputCache[relType][model.id] = model;
+          }
+      }
+  });
+};
+
+Hydration.prototype.hydrate = function(name, model, done) {
+  var self = this;
+  // if the input is an array, then run hydrate on each item and
+  // return back the result
+  if(Array.isArray(model)) {
+    var total = 0,
+        results = [];
+    function checkDone(result, index) {
+      total++;
+      results[index] = result;
+      if(total == model.length) {
+        done(null, results);
+      }
+    }
+    model.forEach(function(item, index) {
+      var h = new Hydration();
+      h.hydrate(name, item, function(err, result) {
+        checkDone(result, index);
+      });
+    });
+    return;
+  }
+  if(typeof model == 'object' && model != null) {
+    self.flatten(name, model);
+  } else if(model == null || model == '') {
+    log.debug('hydrate(): data empty', model);
+    return done(null, null);
+  } else {
+    // e.g. hydrate(Foo, '1a') => hydrate(Foo, { id: '1a'})
+    model = { id: model };
+  }
+  // always iterate the model data to discover dependencies of this model
+  // -- the data given locally may have deps that are not in the remote/cached version
+  var deps = self.getTasks(name, model);
+  // add each dependency into the queue
+  Object.keys(deps).forEach(function(name) {
+    Object.keys(deps[name]).forEach(function(id) {
+      self.add(name, id);
+    });
+  });
+  // run the queue
+  this.next(fetch);
+  // repeated fn
+  function fetch() {
+    if(self.queue.length > 0) {
+      self.next(fetch);
     } else {
-      return onDone(lastError, (!isArray ? models[0] : models));
+      // done, now link and return
+      done(null, self.link(name, model));
     }
   }
-  series(tasks.shift());
 };
 },
 "microee": {"c":1,"m":"index.js"}};
@@ -698,6 +940,41 @@ M.mixin = function(dest) {
   }
 };
 module.exports = M;
-}};
+},
+"package.json": function(module, exports, require){
+module.exports = {
+  "name": "microee",
+  "description": "A tiny EventEmitter-like client and server side library",
+  "version": "0.0.2",
+  "author": {
+    "name": "Mikito Takada",
+    "email": "mixu@mixu.net",
+    "url": "http://mixu.net/"
+  },
+  "keywords": [
+    "event",
+    "events",
+    "eventemitter",
+    "emitter"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/mixu/microee"
+  },
+  "main": "index.js",
+  "scripts": {
+    "test": "./node_modules/.bin/mocha --ui exports --reporter spec --bail ./test/microee.test.js"
+  },
+  "devDependencies": {
+    "mocha": "*"
+  },
+  "readme": "# MicroEE\n\nA client and server side library for routing events.\n\nI was disgusted by the size of [MiniEE](https://github.com/mixu/miniee) (122 sloc, 4.4kb), so I decided a rewrite was in order.\n\nThis time, without the support for regular expressions - but still with the support for \"when\", which is my favorite addition to EventEmitters.\n\nMicroEE is a more satisfying (42 sloc, ~1100 characters), and passes the same tests as MiniEE (excluding the RegExp support, but including slightly tricky ones like removing callbacks set via once() using removeListener where function equality checks are a bit tricky).\n\n# Installing:\n\n    npm install microee\n\n# In-browser version\n\nUse the version in `./dist/`. It exports a single global, `microee`.\n\nTo run the in-browser tests, open `./test/index.html` in the browser after cloning this repo and doing npm install (to get Mocha).\n\n# Using:\n\n    var MicroEE = require('microee');\n    var MyClass = function() {};\n    MicroEE.mixin(MyClass);\n\n    var obj = new MyClass();\n    // set string callback\n    obj.on('event', function(arg1, arg2) { console.log(arg1, arg2); });\n    obj.emit('event', 'aaa', 'bbb'); // trigger callback\n\n# Supported methods\n\n- on(event, listener)\n- once(event, listener)\n- emit(event, [arg1], [arg2], [...])\n- removeListener(event, listener)\n- removeAllListeners([event])\n- when (not part of events.EventEmitter)\n- mixin (not part of events.EventEmitter)\n\n# Niceties\n\n- when(event, callback): like once(event, callback), but only removed if the callback returns true.\n- mixin(obj): adds the MicroEE functions onto the prototype of obj.\n- The following functions return `this`: on(), emit(), once(), when()\n\n# See also:\n\n    http://nodejs.org/api/events.html\n",
+  "readmeFilename": "readme.md",
+  "bugs": {
+    "url": "https://github.com/mixu/microee/issues"
+  },
+  "_id": "microee@0.0.2",
+  "_from": "microee@0.0.2"
+};}};
 mmm = require('index.js');
 }());
