@@ -4,7 +4,8 @@ var assert = require('assert'),
     mmm = require('mmm'),
     server = require('./lib/test_server.js'),
     Post = require('./lib/models.js').Post,
-    Backbone = require('backbone');
+    Backbone = require('backbone'),
+    cache = require('../lib/cache.js');
 
 require('minilog').suggest.deny(/mmm/, 'info');
 require('minilog').enable();
@@ -12,6 +13,7 @@ require('minilog').enable();
 exports['given a simple model'] = {
 
   before: function(done) {
+    cache.clear();
     this.server = http.createServer(function(req, res) {
       server.onRequest(req, res);
     }).listen(8721).on('listening', done);
