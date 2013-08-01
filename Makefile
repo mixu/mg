@@ -1,5 +1,4 @@
-TESTS += test/fetch.test.js
-TESTS += test/notify_local.test.js
+TESTS += test/*.test.js
 
 test:
 	@mocha \

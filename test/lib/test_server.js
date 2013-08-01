@@ -5,12 +5,12 @@ var server = new Server();
 server.add({
   posts: [{
     id: 1,
-    name: 'Foo',
+    name: 'Post1',
     author: 1000
   },
   {
     id: 2,
-    name: 'Foo',
+    name: 'Post2',
     author: 1000,
     comments: [ 1, 2 ]
   }],

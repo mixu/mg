@@ -3,9 +3,10 @@ var assert = require('assert'),
     http = require('http'),
     mmm = require('mmm'),
     server = require('./lib/test_server.js'),
-    Post = require('./lib/models.js').Post;
+    Post = require('./lib/models.js').Post,
+    Backbone = require('backbone');
 
-require('minilog').suggest.deny(/mmm/, 'warn');
+require('minilog').suggest.deny(/mmm/, 'info');
 require('minilog').enable();
 
 exports['given a simple model'] = {
@@ -28,8 +29,8 @@ exports['given a simple model'] = {
   },
 
   'multiple find calls return same instance': function(done) {
-    mmm.findById('Post',1, function(err, val) {
-      mmm.findById('Post',1, function(err, val2) {
+    mmm.findById('Post', 1, function(err, val) {
+      mmm.findById('Post', 1, function(err, val2) {
         assert.equal(val.get('id'), 1);
         assert.strictEqual(val, val2);
         done();
@@ -39,8 +40,8 @@ exports['given a simple model'] = {
 
   'hydration': {
     'can hydrate a one-one relationship': function(done) {
-      mmm.findById('Post',1, function(err, val) {
-  //      console.log(util.inspect(val, false, 10, true));
+      mmm.findById('Post', 1, function(err, val) {
+        // console.log(util.inspect(val, false, 10, true));
         // check that the model id is correct
         assert.equal(val.get('id'), 1);
         // and the model contains a child model, author
@@ -49,35 +50,50 @@ exports['given a simple model'] = {
       });
     },
 
-    'can hydrate a one-many relationship to a array': function(done) {
+    'can hydrate a one-many relationship as a Collection': function(done) {
       // Post (id = 2) has many comments
-      mmm.findById('Post',2, function(err, val) {
+      mmm.findById('Post', 2, function(err, val) {
         assert.equal(val.get('id'), 2);
-        assert.equal(val.get('comments').at(0).get('name'), 'C-1');
-        assert.equal(val.get('comments').at(1).get('name'), 'C-2');
-  //      console.log(util.inspect(val, false, 10, true));
+        var collection = val.get('comments');
+        // console.log(util.inspect(collection, false, 10, true));
+        assert.equal(collection.at(0).get('name'), 'C-1');
+        assert.equal(collection.at(1).get('name'), 'C-2');
         done();
       });
     },
 
-    'can hydrate a collection of individual models from a stream': function() {
-      var collection = mmm.stream('Post' , { }, function() {
-        // console.log(collection);
+    'can hydrate a collection of one-many relationship models from a stream': function(done) {
+      var collection = mmm.stream('Post', { }, function(err, value) {
+        // console.log(util.inspect(collection, false, 4, true));
+        assert.ok(collection instanceof Backbone.Collection);
+        assert.deepEqual(collection.pluck('name'), [ 'Post1', 'Post2']);
+        done();
       });
     },
 
-    'can hydrate a collection of one-many relationship models from a stream': function() {
-
-    },
-
     'when hydrating a collection of items and the collection is empty, do not create any models': function(done) {
-  //    mmm.stream('DataSource' , { }, function() {
-      done();
+      mmm.define('CollectionTest', Backbone.Model.extend({
+        url: 'http://localhost:8721/collectiontest/',
+        sync: mmm.sync('CollectionTest')
+      }));
+
+      mmm.stream('CollectionTest' , { }, function(err, collection) {
+        assert.ok(collection instanceof Backbone.Collection);
+        assert.equal(collection.length, 0);
+        done();
+      });
     }
   },
 
-  'find(..., [id1, id2], ...) should be interpreted as findById': function(done) {
-
+  'findById(..., [ id1, id2 ], should work': function(done) {
+    mmm.findById('Post', [1, 2], function(err, val) {
+      assert.ok(Array.isArray(val));
+      assert.equal(val[0].get('id'), 1);
+      assert.ok(val[0] instanceof Post);
+      assert.equal(val[1].get('id'), 2);
+      assert.ok(val[1] instanceof Post);
+      done();
+    });
   },
 
   'will wait properly for a pending request to complete rather than launching multiple requests': function(done) {

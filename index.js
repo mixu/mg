@@ -30,18 +30,12 @@ function listLocal(name, onDone) {
 }
 
 function listRemote(name, onDone) {
-  log.info('listRemote', name);
-  if(name == 'DataSource') {
-    cache.fetch(name, '/v1/datasources', onDone);
-  } else if(name == 'Project') {
-    cache.fetch(name, '/v1/projects', onDone);
-  } else if(name == 'Post') {
-    cache.fetch(name, '/v1/post', onDone);
-  } else if(name == 'Job') {
-    cache.fetch(name, '/v1/jobs', onDone);
-  } else {
-    console.error('Unknown mmm.stream name');
+  var uri = cache.uri(name);
+  log.info('listRemote', name, uri);
+  if(!uri) {
+    console.error('Unknown mmm.stream URL: ' +name);
   }
+  cache.fetch(name, uri, onDone);
 }
 
 function listBoth(name, onDone) {
@@ -63,10 +57,9 @@ exports.find = function(name, conditions, onDone) {
   }
   if(conditions.id) {
     // get by id
-    return cache.get(name, conditions.id, function(err, result) {
+    return hydrate(name, { id: conditions.id }, function(err, result) {
       if(err) return onDone(err);
       if(result) {
-        // cache returns hydrated results
         onDone(null, result);
       }
     });
@@ -90,7 +83,7 @@ exports.findOne = function(name, conditions, onDone) {
 
 // return a single model by id
 exports.findById = function(name, id, onDone) {
-  return exports.findOne(name, { id: id }, onDone);
+  return hydrate(name, id, onDone);
 };
 
 // returns a pipeable stream
@@ -101,7 +94,7 @@ exports.stream = function(name, conditions, onLoaded) {
     // add the results to the collection
     instance.add(results);
 
-    onLoaded && onLoaded();
+    onLoaded && onLoaded(null, instance);
 
     Stream.on(name, 'destroy', function(model) {
         log.info('mmm.stream remove collection', instance.id, model.id);

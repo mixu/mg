@@ -184,6 +184,7 @@ exports['hydrate associations...'] = {
   },
 
   'hydrate': {
+
     'a model with no associations': function(done) {
       mmm.hydrate('Comment', { text: 'foo' }, function(err, comment) {
         assert.ok(comment instanceof Model.Comment);
@@ -223,6 +224,14 @@ exports['hydrate associations...'] = {
 
         self.postInstance = val;
 
+        done();
+      });
+    },
+
+    'hydrate(..., id) is interpreted as hydrate(..., { id: id})': function(done) {
+      mmm.hydrate('Post', 1, function(err, val) {
+        assert.ok(val instanceof Model.Post);
+        assert.equal(val.get('id'), 1);
         done();
       });
     },
@@ -300,6 +309,27 @@ exports['hydrate associations...'] = {
         var a = model.get('child');
         assert.equal('GGG', a.get('name'));
         assert.strictEqual(model, model.get('child').get('parent'));
+        done();
+      });
+    },
+
+    'a model with a one to many relationship as a Collection': function(done) {
+      cache.store('Post', { id: 200 });
+      cache.store('Comment', { id: 100, value: 'C1' });
+      cache.store('Comment', { id: 200, value: 'C2' });
+
+      mmm.hydrate('Post', {
+          id: 200,
+          name: 'Foo',
+          comments: [ 100, 200 ]
+        }, function(err, val) {
+        assert.ok(val instanceof Model.Post);
+        assert.equal(val.get('id'), 200);
+        assert.equal(val.get('name'), 'Foo');
+        var collection = val.get('comments');
+        // console.log(collection);
+        assert.ok(collection instanceof Backbone.Collection);
+        assert.deepEqual(collection.pluck('value'), [ 'C1', 'C2']);
         done();
       });
     },
