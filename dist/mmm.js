@@ -840,6 +840,11 @@ Hydration.prototype.hydrate = function(name, model, done) {
   // if the input is an array, then run hydrate on each item and
   // return back the result
   if(Array.isArray(model)) {
+    // empty array
+    if(model.length == 0) {
+      log.debug('hydrate(): data empty', model);
+      return done(null, model);
+    }
     var total = 0,
         results = [];
     function checkDone(result, index) {
@@ -861,7 +866,7 @@ Hydration.prototype.hydrate = function(name, model, done) {
     self.flatten(name, model);
   } else if(model == null || model == '') {
     log.debug('hydrate(): data empty', model);
-    return done(null, null);
+    return done(null, model);
   } else {
     // e.g. hydrate(Foo, '1a') => hydrate(Foo, { id: '1a'})
     model = { id: model };
