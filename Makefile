@@ -19,8 +19,11 @@ build:
 		--main index.js \
 		--out dist/mmm.js
 
+style:
+	jshint index.js server.js lib
+
 # disabled:
 #		--source-url \
 #		--nocommand 'uglifyjs --no-copyright' \
 
-.PHONY: test build case
+.PHONY: test build case style

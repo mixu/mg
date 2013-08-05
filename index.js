@@ -68,7 +68,7 @@ exports.find = function(name, conditions, onDone) {
     });
   }
   // this is how we say "get all"
-  if(conditions.since == 0) {
+  if(conditions.since === 0) {
     return listBoth(name, onDone);
   }
 
@@ -81,7 +81,7 @@ exports.find = function(name, conditions, onDone) {
 exports.findOne = function(name, conditions, onDone) {
   return exports.find(name, conditions, function(err, result) {
     return onDone(err, result);
-  })
+  });
 };
 
 // return a single model by id
@@ -174,7 +174,7 @@ exports.sync = function(name) {
           return resp;
         };
         oldSuccess.apply(opts, arguments);
-      }
+      };
     }
     // delete can be tracked after this via the "destroy" event on the model
 
