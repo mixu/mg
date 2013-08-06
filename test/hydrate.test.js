@@ -36,7 +36,13 @@ mmm.define('ModelWithGrandChild', ModelWithGrandChild);
 
 exports['hydrate values...'] = {
   'date string as date object': function() {
-
+    var WithDate = Backbone.Model.extend({
+      sync: mmm.sync('WithDate'),
+      rels: {
+        'date': { type: Date }
+      }
+    });
+    mmm.define('WithDate', WithDate);
   },
 
   'empty date as a 1970\'s date object': function() {
@@ -44,7 +50,13 @@ exports['hydrate values...'] = {
   },
 
   'regexp string as regexp object': function() {
-
+    var WithRe = Backbone.Model.extend({
+      sync: mmm.sync('WithRe'),
+      rels: {
+        're': { type: RegExp }
+      }
+    });
+    mmm.define('WithRe', WithRe);
   },
 
   'empty regexp as regexp object': function() {
@@ -52,6 +64,13 @@ exports['hydrate values...'] = {
   },
 
   'hydrate a default value': function() {
+    var WithDefault = Backbone.Model.extend({
+      sync: mmm.sync('WithDefault'),
+      rels: {
+        'foo': { type: String, default: 'bar' }
+      }
+    });
+    mmm.define('WithDefault', WithDefault);
 
   }
 };

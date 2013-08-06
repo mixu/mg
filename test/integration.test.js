@@ -96,6 +96,31 @@ exports['given a simple model'] = {
       assert.ok(val[1] instanceof Post);
       done();
     });
+  },
+
+  'update': {
+
+    'property that is a single model needs to be converted to an ID': function() {
+
+    },
+
+    'property that is a collection needs to be converted to an array of IDs': function() {
+
+    }
+  },
+
+  'delete': {
+    'delete should remove model from regular collections': function() {
+
+    },
+
+    'delete should remove model from streamed collections': function() {
+
+    },
+
+    'delete should remove model from the cache': function() {
+
+    }
   }
 };
 
