@@ -388,6 +388,16 @@ exports['hydrate associations...'] = {
       });
     }
 
+    // for newly created models, we have an instance of the model already,
+    // and the purpose of hydration is to assign an id and to hydrate any new dependent properties
+    // E.g. send { name: 'foo' } -> receive { id: 2, name: 'foo', child: 1000 }
+    // and the result needs to be translated into a set of properties to set on the
+    // already-instantiated model (which also needs to be cached after the set has occurred)
+
+    'if the data is a model instance, use it rather than creating a new instance': function() {
+
+    }
+
   }
 };
 

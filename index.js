@@ -129,25 +129,15 @@ exports.sync = function(name) {
     // to hook up to the stream, bind on "create"
     if(op == 'create') {
       var oldSuccess = opts.success;
-      opts.success = function() {
+      // must store the old success, since the content of the success function can vary
+      opts.success = function(data) {
         // after create,
-        // 1. unwrap (really, is a call to parse)
         var oldParse = model.parse;
-        // discarding the success callback is not really feasible,
-        // but if you call it with the original parse function,
-        // the same parse logic will be applied to both "created"
-        // and "updated"/"patched" models.
         // Created models are the only ones where we need to freshly create
         // new collections since the original models do not have the right properties
         // and do not go through the normal find/hydrate pipeline
-        model.parse = function(resp, options) {
+        model.parse = function(data, options) {
           model.parse = oldParse;
-
-          // 1. hydrate -- existing model (e.g. inside parse)
-          // the issue here is that hydrate requires a async() api
-          // but Backbone parse only works with a synchronous API
-
-          var rels = meta.get(name, 'rels');
 
           // Tricky!
           // The Stream notification call has to occur after the model is completely set.
@@ -159,20 +149,20 @@ exports.sync = function(name) {
             Stream.onFetch(name, model);
           });
 
-          // set the onSync callback before this
-          if(!rels || typeof rels != 'object') return resp;
-
-          Object.keys(rels).forEach(function(key) {
-            var current = resp[key],
-                currentType = rels[key].type;
-            if(!current || !current.add) {
-              log.debug('Initializing collection "'+key+'" of type "'+meta.get(currentType, 'collection')+'" in `.parse` interception for '+name);
-              resp[key] = new (meta.collection(currentType))();
-            }
-          });
           // BB calls model.set with this
-          return resp;
+          return data;
         };
+
+        // the issue here is that hydrate requires a async() api
+        // but Backbone parse only works with a synchronous API
+        //
+        // The solution is to intercept the .success callback, which is
+        // asynchronous; do all the asynchronous work there, and then
+        // use .parse to only set the results of the asynchronous work.
+
+        hydrate(name, )
+
+
         oldSuccess.apply(opts, arguments);
       };
     }

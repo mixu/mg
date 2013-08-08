@@ -4,6 +4,7 @@ var assert = require('assert'),
     mmm = require('mmm'),
     server = require('./lib/test_server.js'),
     Post = require('./lib/models.js').Post,
+    Comment = require('./lib/models.js').Comment,
     Backbone = require('backbone'),
     cache = require('../lib/cache.js');
 
@@ -98,13 +99,42 @@ exports['given a simple model'] = {
     });
   },
 
-  'update': {
+  'save': {
 
-    'property that is a single model needs to be converted to an ID': function() {
+    'if the backend adds a new property that is a hydratable model id, hydrate it': function(done) {
+      var ResponseTest = mmm.define('ResponseTest', Backbone.Model.extend({
+        url: 'http://localhost:8721/ResponseTest',
+        sync: mmm.sync('ResponseTest'),
+        rels: {
+          child: { type: 'Comment' }
+        }
+      }));
+
+      server.once('POST /ResponseTest', function(req, res) {
+        req.body.id = 1;
+        req.body.child = 1000;
+        res.end(JSON.stringify(req.body));
+      });
+
+      var instance = new ResponseTest();
+      instance.save({ name: 'foo' }, {
+        success: function() {
+          console.log(instance);
+          assert.ok(instance instanceof ResponseTest);
+          assert.equal(instance.get('name'), 'foo');
+          assert.equal(instance.get('id'), 1);
+          assert.ok(instance.get('child') instanceof Comment);
+          assert.equal(instance.get('child').get('id'), 1000);
+          done();
+        }
+      });
+    },
+
+    'dehydrate property that is a single model needs to be converted to an ID': function() {
 
     },
 
-    'property that is a collection needs to be converted to an array of IDs': function() {
+    'dehydrate property that is a collection needs to be converted to an array of IDs': function() {
 
     }
   },
