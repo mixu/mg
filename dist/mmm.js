@@ -10,7 +10,8 @@ var cache = require('./lib/cache.js'),
     Stream = require('./lib/stream.js'),
     Backbone = require('backbone'),
     ajax = require('./lib/ajax.js'),
-    log = require('minilog')('mmm');
+    log = require('minilog')('mmm'),
+    util = require('./lib/util.js');
 
 if(typeof window == 'undefined') {
   var najax = require('najax');
@@ -74,7 +75,7 @@ exports.find = function(name, conditions, onDone) {
     });
   }
   // this is how we say "get all"
-  if(conditions.since == 0) {
+  if(conditions.since === 0) {
     return listBoth(name, onDone);
   }
 
@@ -87,7 +88,7 @@ exports.find = function(name, conditions, onDone) {
 exports.findOne = function(name, conditions, onDone) {
   return exports.find(name, conditions, function(err, result) {
     return onDone(err, result);
-  })
+  });
 };
 
 // return a single model by id
@@ -135,52 +136,58 @@ exports.sync = function(name) {
     // to hook up to the stream, bind on "create"
     if(op == 'create') {
       var oldSuccess = opts.success;
-      opts.success = function() {
-        // after create,
-        // 1. unwrap (really, is a call to parse)
+      // must store the old success, since the content of the success function can vary
+      opts.success = function(data) {
+        // after create:
         var oldParse = model.parse;
-        // discarding the success callback is not really feasible,
-        // but if you call it with the original parse function,
-        // the same parse logic will be applied to both "created"
-        // and "updated"/"patched" models.
-        // Created models are the only ones where we need to freshly create
-        // new collections since the original models do not have the right properties
-        // and do not go through the normal find/hydrate pipeline
-        model.parse = function(resp, options) {
-          model.parse = oldParse;
+        // the issue here is that hydrate requires a async() api
+        // but Backbone parse only works with a synchronous API
+        //
+        // The solution is to intercept the .success callback, which is
+        // asynchronous; do all the asynchronous work there, and then
+        // use .parse to only set the results of the asynchronous work.
 
-          // 1. hydrate -- existing model (e.g. inside parse)
-          // the issue here is that hydrate requires a async() api
-          // but Backbone parse only works with a synchronous API
+        // merge data prior to calling hydrate, since hydrate with a
+        // `instanceof` the right class will reuse that instance
+        util.keys(data).forEach(function(key) {
+          // console.log('set', key, util.get(data, key));
+          util.set(model, key, util.get(data, key));
+        });
 
-          var rels = meta.get(name, 'rels');
+        hydrate(name, model, function(err, hydrated) {
 
-          // Tricky!
-          // The Stream notification call has to occur after the model is completely set.
-          // Since BB calls model.set(model.parse( ... )), the properties
-          // are not set until we return from parse
-          // The success function emits "sync" so we'll use that
-          model.once('sync', function() {
-            log.debug('model.sync', name, model.id);
-            Stream.onFetch(name, model);
+          console.log(hydrated === model);
+
+
+          // post-hydration, everything should be an instance of the right thing.
+          // update the stored values, but do not change the object instance
+          util.keys(hydrated).forEach(function(key) {
+            // console.log('set', key, util.get(hydrated, key));
+            util.set(model, key, util.get(hydrated, key));
           });
 
-          // set the onSync callback before this
-          if(!rels || typeof rels != 'object') return resp;
+          // Created models are the only ones where we need to freshly create
+          // new collections since the original models do not have the right properties
+          // and do not go through the normal find/hydrate pipeline
+          model.parse = function(data, options) {
+            model.parse = oldParse;
 
-          Object.keys(rels).forEach(function(key) {
-            var current = resp[key],
-                currentType = rels[key].type;
-            if(!current || !current.add) {
-              log.debug('Initializing collection "'+key+'" of type "'+meta.get(currentType, 'collection')+'" in `.parse` interception for '+name);
-              resp[key] = new (meta.collection(currentType))();
-            }
-          });
-          // BB calls model.set with this
-          return resp;
-        };
-        oldSuccess.apply(opts, arguments);
-      }
+            // Tricky!
+            // The Stream notification call has to occur after the model is completely set.
+            // Since BB calls model.set(model.parse( ... )), the properties
+            // are not set until we return from parse
+            // The success function emits "sync" so we'll use that
+            model.once('sync', function() {
+              log.debug('model.sync', name, model.id);
+              Stream.onFetch(name, model);
+            });
+
+            // BB calls model.set with this
+            return {};
+          };
+          oldSuccess.apply(opts, arguments);
+        });
+      };
     }
     // delete can be tracked after this via the "destroy" event on the model
 
@@ -214,7 +221,7 @@ function fetch(uri, callback) {
   return request({ hostname: parts.hostname, path: parts.pathname, port: parts.port }, function(err, data, res) {
     callback(err, data);
   });
-};
+}
 
 // Backbone expects the response to be a plain object, not a instance of a model
 // But that's fine, since this method is only used for .findX() calls, where Backbone is not directly
@@ -233,7 +240,7 @@ function ajaxFetch(uri, callback) {
         callback(textStatus, null);
       }
     });
-};
+}
 
 module.exports = (typeof window == 'undefined' ? fetch : ajaxFetch);
 },
@@ -301,6 +308,7 @@ exports.define = function(name, mmeta) {
   // Assume we are given a Backbone model. All the interesting properties are on the prototype.
   meta[name] = mmeta.prototype;
   model[name] = mmeta;
+  return mmeta;
 };
 
 },
@@ -352,12 +360,15 @@ function unwrapJSONAPI(name, data) {
 
 // returns an plain array (multiple items) or a plain object (single item)
 function unwrapBackboneAPI(name, data) {
+  if(typeof data === 'string') {
+    throw new Error('Unexpected string: ' + data);
+  }
   return data;
 }
 
 function unwrap(name, data) {
   return unwrapBackboneAPI(name, data);
-};
+}
 
 // Lookup from cache by id
 exports.local = function local(name, id) {
@@ -416,6 +427,7 @@ exports.store = function(name, values) {
       }
     } else {
       log.warn('Cannot cache model without an id', value);
+      // console.trace();
     }
   });
 };
@@ -424,7 +436,7 @@ exports.store = function(name, values) {
 // Mirrors the ajax.fetch function -- but does all the additional work
 // of unwrapping, hydrating and cache-storing content
 exports.fetch = function(name, uri, onDone) {
-  var isPending = !(typeof callbacks[uri] == 'undefined');
+  var isPending = (typeof callbacks[uri] != 'undefined');
   if(!callbacks[uri]) {
     callbacks[uri] = [];
   }
@@ -444,7 +456,7 @@ exports.fetch = function(name, uri, onDone) {
     ajax(uri, function(err, data) {
         if(err) return emit(err, null);
         // the data can be empty (e.g. nothing to hydrate)
-        if(!data || Array.isArray(data) && data.length == 0) {
+        if(!data || Array.isArray(data) && data.length === 0) {
           log.debug('ajax empty onDone '+uri, data);
           return emit(null, data);
         }
@@ -619,7 +631,7 @@ Hydration.prototype.getTasks = function(name, model) {
   var result = {};
 
   // the current model is a task if it has an id
-  if(model.id != null && model.id !== '') {
+  if(model && model.id && model.id != null && model.id !== '') {
     if(!result[name]) {
       result[name] = {};
     }
@@ -680,14 +692,25 @@ Hydration.prototype.next = function(done) {
       }
     }
     log.info('Intermediate cache:', name, id);
-    // merge with inputcache
+    // merge with inputcache (e.g. so that input ids will be hydrated)
     if(self.inputCache[name] && self.inputCache[name][id]) {
-      // override values in the cached instance with values from the root model
-      var input = self.inputCache[name][id],
-          keys = util.keys(input);
-      keys.forEach(function(key) {
-        util.set(result, key, util.get(input, key));
-      });
+      var modelClass = meta.model(name);
+      log.info('Override values for:', name, id);
+      if (self.inputCache[name][id] instanceof modelClass) {
+        // if the input is an instance, then reuse it
+        util.keys(result).forEach(function(key) {
+          if(typeof util.get(self.inputCache[name][id], key) === 'undefined') {
+            util.set(self.inputCache[name][id], key, util.get(result, key));
+          }
+        });
+        // to avoid creating duplicates when the model instance already exists
+        result = self.inputCache[name][id];
+      } else {
+        // default to using the cached model as the basis
+        util.keys(self.inputCache[name][id]).forEach(function(key) {
+          util.set(result, key, util.get(self.inputCache[name][id], key));
+        });
+      }
     }
     if(!self.cache[name]) {
       self.cache[name] = {};
@@ -746,7 +769,7 @@ Hydration.prototype.linkRel = function(name, instance) {
       switch(typeof modelId) {
         case 'number':
         case 'string':
-          log.info('Link', key, 'to', relType, modelId);
+          log.info('Link', key, 'to', relType, modelId, self.cache[relType][modelId]);
           if(isCollection) {
             value.add(self.cache[relType][modelId]);
           } else {
@@ -777,7 +800,7 @@ Hydration.prototype.link = function(name, model) {
       var modelClass = meta.model(name);
       // instantiate the model if necessary
       if(!(self.cache[name][id] instanceof modelClass)) {
-        // log.info('Not an instance of '+name+', instantiating model.');
+        log.info('Not an instance of '+name+', instantiating model for', id);
         self.cache[name][id] = new modelClass(self.cache[name][id]);
       }
     });
@@ -841,7 +864,7 @@ Hydration.prototype.hydrate = function(name, model, done) {
   // return back the result
   if(Array.isArray(model)) {
     // empty array
-    if(model.length == 0) {
+    if(model.length === 0) {
       log.debug('hydrate(): data empty', model);
       return done(null, model);
     }
@@ -862,9 +885,9 @@ Hydration.prototype.hydrate = function(name, model, done) {
     });
     return;
   }
-  if(typeof model == 'object' && model != null) {
+  if(typeof model == 'object' && model !== null) {
     self.flatten(name, model);
-  } else if(model == null || model == '') {
+  } else if(model === null || model === '') {
     log.debug('hydrate(): data empty', model);
     return done(null, model);
   } else {
