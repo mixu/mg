@@ -7,6 +7,7 @@ function request(opts, onDone) {
       body += chunk;
     });
     res.on('end', function() {
+      // console.log(res.headers);
       if(res.headers['content-type'] == 'application/json') {
         try {
           onDone(undefined, JSON.parse(body), res);

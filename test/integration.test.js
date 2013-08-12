@@ -112,9 +112,16 @@ exports['given a simple model'] = {
 
       server.once('POST /ResponseTest', function(req, res) {
         req.body.id = 1;
-        req.body.child = 1000;
+        req.body.child = 1234;
+        res.setHeader('content-type', 'application/json');
         res.end(JSON.stringify(req.body));
       });
+
+      server.once('GET /ResponseTest/1', function(req, res) {
+        res.setHeader('content-type', 'application/json');
+        res.end(JSON.stringify({ id: 1, child: 1234, name: 'foo' }));
+      });
+
 
       var instance = new ResponseTest();
       instance.save({ name: 'foo' }, {
@@ -124,7 +131,7 @@ exports['given a simple model'] = {
           assert.equal(instance.get('name'), 'foo');
           assert.equal(instance.get('id'), 1);
           assert.ok(instance.get('child') instanceof Comment);
-          assert.equal(instance.get('child').get('id'), 1000);
+          assert.equal(instance.get('child').get('id'), 1234);
           done();
         }
       });

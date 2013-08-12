@@ -4,7 +4,8 @@ var cache = require('./lib/cache.js'),
     Stream = require('./lib/stream.js'),
     Backbone = require('backbone'),
     ajax = require('./lib/ajax.js'),
-    log = require('minilog')('mmm');
+    log = require('minilog')('mmm'),
+    util = require('./lib/util.js');
 
 if(typeof window == 'undefined') {
   var najax = require('najax');
@@ -131,28 +132,8 @@ exports.sync = function(name) {
       var oldSuccess = opts.success;
       // must store the old success, since the content of the success function can vary
       opts.success = function(data) {
-        // after create,
+        // after create:
         var oldParse = model.parse;
-        // Created models are the only ones where we need to freshly create
-        // new collections since the original models do not have the right properties
-        // and do not go through the normal find/hydrate pipeline
-        model.parse = function(data, options) {
-          model.parse = oldParse;
-
-          // Tricky!
-          // The Stream notification call has to occur after the model is completely set.
-          // Since BB calls model.set(model.parse( ... )), the properties
-          // are not set until we return from parse
-          // The success function emits "sync" so we'll use that
-          model.once('sync', function() {
-            log.debug('model.sync', name, model.id);
-            Stream.onFetch(name, model);
-          });
-
-          // BB calls model.set with this
-          return data;
-        };
-
         // the issue here is that hydrate requires a async() api
         // but Backbone parse only works with a synchronous API
         //
@@ -160,10 +141,46 @@ exports.sync = function(name) {
         // asynchronous; do all the asynchronous work there, and then
         // use .parse to only set the results of the asynchronous work.
 
-        hydrate(name, )
+        // merge data prior to calling hydrate, since hydrate with a
+        // `instanceof` the right class will reuse that instance
+        util.keys(data).forEach(function(key) {
+          // console.log('set', key, util.get(data, key));
+          util.set(model, key, util.get(data, key));
+        });
+
+        hydrate(name, model, function(err, hydrated) {
+
+          console.log(hydrated === model);
 
 
-        oldSuccess.apply(opts, arguments);
+          // post-hydration, everything should be an instance of the right thing.
+          // update the stored values, but do not change the object instance
+          util.keys(hydrated).forEach(function(key) {
+            // console.log('set', key, util.get(hydrated, key));
+            util.set(model, key, util.get(hydrated, key));
+          });
+
+          // Created models are the only ones where we need to freshly create
+          // new collections since the original models do not have the right properties
+          // and do not go through the normal find/hydrate pipeline
+          model.parse = function(data, options) {
+            model.parse = oldParse;
+
+            // Tricky!
+            // The Stream notification call has to occur after the model is completely set.
+            // Since BB calls model.set(model.parse( ... )), the properties
+            // are not set until we return from parse
+            // The success function emits "sync" so we'll use that
+            model.once('sync', function() {
+              log.debug('model.sync', name, model.id);
+              Stream.onFetch(name, model);
+            });
+
+            // BB calls model.set with this
+            return {};
+          };
+          oldSuccess.apply(opts, arguments);
+        });
       };
     }
     // delete can be tracked after this via the "destroy" event on the model

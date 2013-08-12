@@ -81,7 +81,7 @@ exports['hydrate associations...'] = {
     var self = this;
     this.ajaxCalls = [];
     cache._setAjax(fakeAjax({
-      posts: [ { id: 1, name: 'Posts1' } ],
+      posts: [ { id: 1, name: 'Posts1' }, { id: 555, name: 'Posts1' }, ],
       people: [ { id: 1000, name: 'Bar' } ],
       SimpleModel: [ 1, 2, 3 ].map(function(i) {
         return { id: i, name: 'Simple'+i };
@@ -377,7 +377,7 @@ exports['hydrate associations...'] = {
         assert.equal(self.ajaxCalls.length, 0);
 
         // assert that the instance was reused
-        assert.strictEqual(val,  self.postInstance);
+        assert.strictEqual(val, self.postInstance);
         // with updated value
         assert.equal(val.get('name'), 'New post');
         // and the rest of the data is like before
@@ -386,7 +386,7 @@ exports['hydrate associations...'] = {
 
         done();
       });
-    }
+    },
 
     // for newly created models, we have an instance of the model already,
     // and the purpose of hydration is to assign an id and to hydrate any new dependent properties
@@ -394,10 +394,45 @@ exports['hydrate associations...'] = {
     // and the result needs to be translated into a set of properties to set on the
     // already-instantiated model (which also needs to be cached after the set has occurred)
 
-    'if the data is a model instance, use it rather than creating a new instance': function() {
+    'if the data is a model instance, use it rather than creating a new instance, from cache': function(done) {
+      mmm.hydrate('Post', { id: 1 } , function(err, instance) {
+        instance.set('Foo', 'bar');
+        mmm.hydrate('Post', instance, function(err, val) {
+          assert.strictEqual(instance, val);
+          assert.equal(val.get('Foo'), 'bar');
+          done();
+        });
+      });
+    },
 
+    'if the data is a model instance, use it rather than creating a new instance, external': function(done) {
+      var instance = new Model.Post();
+      instance.set('Foo', 'bar');
+      instance.set('author', 1000);
+      mmm.hydrate('Post', instance, function(err, val) {
+        assert.ok(instance === val);
+        assert.equal(val.get('Foo'), 'bar');
+        assert.equal(val.get('author').get('name'), 'Bar');
+        done();
+      });
+    },
+
+    'if the data is a model instance, use it rather than creating a new instance, external, with id': function(done) {
+      var instance = new Model.Post();
+      // adding an ID tempts the hydration layer to fetch it
+      // this happens for real when saving -> success -> hydrate -> (parse) -> return
+      instance.set('id', 555);
+      instance.set('Foo', 'bar');
+      instance.set('author', 1000);
+      assert.ok(instance instanceof Model.Post);
+      mmm.hydrate('Post', instance, function(err, val) {
+        assert.ok(val instanceof Model.Post);
+        assert.strictEqual(instance, val);
+        assert.equal(val.get('Foo'), 'bar');
+        assert.equal(val.get('author').get('name'), 'Bar');
+        done();
+      });
     }
-
   }
 };
 
