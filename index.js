@@ -150,10 +150,6 @@ exports.sync = function(name) {
         });
 
         hydrate(name, model, function(err, hydrated) {
-
-          console.log(hydrated === model);
-
-
           // post-hydration, everything should be an instance of the right thing.
           // update the stored values, but do not change the object instance
           util.keys(hydrated).forEach(function(key) {

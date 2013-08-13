@@ -17,7 +17,7 @@
     "express": "~3.2.4",
     "gluejs": "~2.x",
     "minilog": "~2.x",
-    "mixu_minimal": "git+ssh://git@github.com:mixu/minimal.git"
+    "mixu_minimal": "git+https://mixu@github.com/mixu/minimal.git"
   },
   "dependencies": {
     "backbone": "~1.0.0",

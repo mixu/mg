@@ -62,12 +62,13 @@ function listBoth(name, onDone) {
 
 // return a collection of models based on a set of conditions
 exports.find = function(name, conditions, onDone) {
+  var idAttr = meta.get(name, 'idAttribute') || 'id';
   if(typeof conditions != 'object') {
     log.warn('Warning: find() conditions not an object!');
   }
-  if(conditions.id) {
+  if(conditions[idAttr]) {
     // get by id
-    return hydrate(name, { id: conditions.id }, function(err, result) {
+    return hydrate(name, conditions[idAttr], function(err, result) {
       if(err) return onDone(err);
       if(result) {
         onDone(null, result);
@@ -401,29 +402,29 @@ exports.uri = function(name, id) {
 exports.store = function(name, values) {
   if(!cache[name]) { cache[name] = {}; }
 
+  var idAttr = meta.get(name, 'idAttribute') || 'id';
   // result may be a single item or array
   (Array.isArray(values) ? values : [ values ]).forEach(function(value) {
-
+    var id;
     // this is the right point to notify the stream - once the model instances
     // have been fetched, unwrapped and hydrated.
     Stream.onFetch(name, value);
 
-    if(value && value.id) {
-      if(cache[name][value.id]) {
-        log.debug('Updating values', name, value.id);
+    if(value && util.get(value, idAttr)) {
+      id = util.get(value, idAttr);
+      if(cache[name][id]) {
+        log.debug('Updating values', name, id);
         // update the stored values, but do not change the object instance
         util.keys(value).forEach(function(key) {
-          // console.log('set', key, util.get(value, key));
-          util.set(cache[name][value.id], key, util.get(value, key));
+          util.set(cache[name][id], key, util.get(value, key));
         });
         return;
       } else {
-        log.debug('Caching first time', name, value.id);
-        cache[name][value.id] = value;
+        log.debug('Caching first time', name, id);
+        cache[name][id] = value;
       }
     } else {
-      log.warn('Cannot cache model without an id', value);
-      // console.trace();
+      log.warn('Cannot cache model without an '+idAttr, name, value);
     }
   });
 };
@@ -571,7 +572,8 @@ var cache = require('./cache.js'),
     meta = require('./meta.js'),
     util = require('./util.js'),
     Collection = require('backbone').Collection,
-    log = require('minilog')('mmm/hydration');
+    log = require('minilog')('mmm/hydration'),
+    get = util.get;
 
 module.exports = function hydrate(name, models, onDone) {
   var h = new Hydration();
@@ -588,7 +590,7 @@ function forEachRelationValue(name, model, eachFn) {
   // for each key-value pair, run the eachFn
   Object.keys(rels).forEach(function(key) {
     // is a value set that needs to be hydrated?
-    var ids = util.get(model, key),
+    var ids = get(model, key),
         relType = rels[key].type;
 
     // if the value is a Collection, use the models property
@@ -624,15 +626,17 @@ Hydration.prototype.canQueue = function(name, id) {
 
 // given model data, return the tasks
 Hydration.prototype.getTasks = function(name, model) {
-  var result = {};
+  var result = {},
+      idAttr = meta.get(name, 'idAttribute') || 'id',
+      id = get(model, idAttr);
 
   // the current model is a task if it has an id
-  if(model && model.id && model.id != null && model.id !== '') {
+  if(id && id != null && id !== '') {
     if(!result[name]) {
       result[name] = {};
     }
-    log.info('Queue hydration for:', name, model.id);
-    result[name][model.id] = true;
+    log.info('Queue hydration for:', name, id);
+    result[name][id] = true;
   }
   forEachRelationValue(name, model, function(key, relType, id) {
     if(!result[relType]) {
@@ -646,10 +650,11 @@ Hydration.prototype.getTasks = function(name, model) {
         result[relType][id] = true;
         break;
       case 'object':
+        var idAttr = meta.get(relType, 'idAttribute') || 'id';
         // model.id
-        if(id.id) {
-          log.info('Queue hydration for:', relType, id.id);
-          result[relType][id.id] = true;
+        if(id && get(id, idAttr)) {
+          log.info('Queue hydration for:', relType, get(id, idAttr));
+          result[relType][get(id, idAttr)] = true;
         }
     }
   });
@@ -730,8 +735,9 @@ Hydration.prototype.next = function(done) {
 Hydration.prototype.linkRel = function(name, instance) {
   var self = this;
    // check it's rels, and store the appropriate link
-  var rels = meta.get(name, 'rels');
-  log.info('LinkRels', name, instance.id, rels);
+  var rels = meta.get(name, 'rels'),
+        idAttr = meta.get(name, 'idAttribute') || 'id';
+  log.info('LinkRels', name, get(instance, idAttr), rels);
   // shortcut if no rels to consider
   if(!rels) return instance;
   // for each key-value pair, run the eachFn
@@ -739,7 +745,7 @@ Hydration.prototype.linkRel = function(name, instance) {
     // is a value set that needs to be hydrated?
     var ids = util.get(instance, key),
         value = util.get(instance, key),
-        isCollection = (value && value.add),
+        isCollection = !!(value && value.add),
         relType = rels[key].type;
 
     // if the value is a Collection, use the models property
@@ -765,7 +771,7 @@ Hydration.prototype.linkRel = function(name, instance) {
       switch(typeof modelId) {
         case 'number':
         case 'string':
-          log.info('Link', key, 'to', relType, modelId, self.cache[relType][modelId]);
+          log.info('Link', key, 'to', relType, modelId, isCollection);
           if(isCollection) {
             value.add(self.cache[relType][modelId]);
           } else {
@@ -773,13 +779,14 @@ Hydration.prototype.linkRel = function(name, instance) {
           }
           break;
         case 'object':
-          // model.id
-          if(modelId.id) {
-            log.info('Link', key, 'to', relType, modelId.id);
+          var idAttr = meta.get(relType, 'idAttribute') || 'id',
+              id = get(modelId, idAttr);
+          if(id) {
+            log.info('Link', key, 'to', relType, id, isCollection);
             if(isCollection) {
-              value.add(self.cache[relType][modelId.id]);
+              value.add(self.cache[relType][id]);
             } else {
-              util.set(instance, key, self.cache[relType][modelId.id]);
+              util.set(instance, key, self.cache[relType][id]);
             }
           }
       }
@@ -789,7 +796,8 @@ Hydration.prototype.linkRel = function(name, instance) {
 };
 
 Hydration.prototype.link = function(name, model) {
-  var self = this;
+  var self = this,
+      idAttr = meta.get(name, 'idAttribute') || 'id';
   // all models must be instantiated first
   Object.keys(self.cache).forEach(function(name) {
     Object.keys(self.cache[name]).forEach(function(id) {
@@ -811,9 +819,9 @@ Hydration.prototype.link = function(name, model) {
     });
   });
   // return root
-  if(model.id) {
+  if(get(model, idAttr)) {
     // if the model has an id, just use the cached version
-    var result = this.cache[name][model.id];
+    var result = this.cache[name][get(model, idAttr)];
     cache.store(name, result);
     return result;
   } else {
@@ -831,24 +839,27 @@ Hydration.prototype.link = function(name, model) {
 };
 
 Hydration.prototype.flatten = function(name, model) {
-  var self = this;
-  if(model.id) {
+  var self = this,
+      idAttr = meta.get(name, 'idAttribute') || 'id',
+      id = get(model, idAttr);
+  if(id) {
     if(!this.inputCache[name]) {
       this.inputCache[name] = {};
     }
-    this.inputCache[name][model.id] = model;
+    this.inputCache[name][id] = model;
   }
 
   forEachRelationValue(name, model, function(key, relType, model) {
       // items may be either numbers, strings or models
       switch(typeof model) {
         case 'object':
-          // model.id
-          if(model.id) {
+          var idAttr = meta.get(relType, 'idAttribute') || 'id',
+              id = util.get(model, idAttr);
+          if(id) {
             if(!self.inputCache[relType]) {
               self.inputCache[relType] = {};
             }
-            self.inputCache[relType][model.id] = model;
+            self.inputCache[relType][id] = model;
           }
       }
   });
@@ -888,7 +899,10 @@ Hydration.prototype.hydrate = function(name, model, done) {
     return done(null, model);
   } else {
     // e.g. hydrate(Foo, '1a') => hydrate(Foo, { id: '1a'})
-    model = { id: model };
+    var id = model,
+        idAttr = meta.get(name, 'idAttribute') || 'id';
+    model = {};
+    util.set(model, idAttr, id);
   }
   // always iterate the model data to discover dependencies of this model
   // -- the data given locally may have deps that are not in the remote/cached version
