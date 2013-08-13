@@ -1,4 +1,5 @@
-var url = require('url');
+var url = require('url'),
+    meta = require('../../lib/meta.js');
 
 var ajaxCalls = [];
 
@@ -17,10 +18,14 @@ module.exports = function(dataset) {
       if(!dataset[type]) {
         throw new Error(type + ' not in test dataset!');
       }
-      var result;
+      var result,
+          idAttribute = 'id';
+      if(type == 'posts') {
+        idAttribute = '__id';
+      }
 
       dataset[type].some(function(item) {
-        var match = item.id == id;
+        var match = item[idAttribute] == id;
         if(match) {
           result = item;
         }
@@ -28,7 +33,7 @@ module.exports = function(dataset) {
       });
 
       if(!result) {
-        throw new Error(type + ', id=' +id+ ' not found!');
+        throw new Error(type + ', '+idAttribute+'=' +id+ ' not found!');
       }
       callback(null, result);
   }

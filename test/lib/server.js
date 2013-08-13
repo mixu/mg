@@ -160,7 +160,7 @@ CollectionServer.prototype.findById = function(collection, ids, onDone) {
       return !isNaN(id);
     }).forEach(function(id) {
       self.cache[collection].some(function(model) {
-        if(model.id == id) {
+        if(model.id == id || model.__id == id) {
           results.push(model);
           return true;
         }

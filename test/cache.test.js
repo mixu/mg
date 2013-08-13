@@ -9,6 +9,14 @@ require('minilog').enable();
 
 exports['test cache'] = {
 
+  before: function() {
+    mmm.define('test', Backbone.Model.extend({
+      sync: mmm.sync('test'),
+      type: 'test',
+      url: 'http://localhost:7000/test/'
+    }));
+  },
+
   after: function() {
     var ajax = require('../lib/ajax.js');
     cache._setAjax(ajax);
@@ -40,12 +48,6 @@ exports['test cache'] = {
   },
 
   'fetching a model thats not available causes a external fetch': function(done) {
-    var test = Backbone.Model.extend({
-      sync: mmm.sync('test'), // really only needed for writing
-      url: 'http://localhost:7000/test/'
-    });
-    mmm.define('test', test);
-
     cache._setAjax(function(uri, onDone) {
       assert.equal('http://localhost:7000/test/9000', uri);
       onDone(null, { id: 7000});
@@ -87,6 +89,23 @@ exports['test cache'] = {
     cache.get('test', 7000, function(err, result) {
       assert.strictEqual(item, result);
       assert.equal(result.name, 'bar');
+      done();
+    });
+  },
+
+  'can cache an model with a different idAttribute': function(done) {
+    var item = { __id: 7000, name: 'foo' };
+    mmm.define('AttrTest', Backbone.Model.extend({
+      sync: mmm.sync('AttrTest'),
+      type: 'AttrTest',
+      idAttribute: '__id',
+      url: 'http://'
+    }));
+    cache.store('AttrTest', item);
+    cache.get('AttrTest', 7000, function(err, result) {
+      assert.strictEqual(item, result);
+      assert.equal(result.name, 'foo');
+      assert.equal(result.__id, 7000);
       done();
     });
   }

@@ -56,12 +56,13 @@ function listBoth(name, onDone) {
 
 // return a collection of models based on a set of conditions
 exports.find = function(name, conditions, onDone) {
+  var idAttr = meta.get(name, 'idAttribute') || 'id';
   if(typeof conditions != 'object') {
     log.warn('Warning: find() conditions not an object!');
   }
-  if(conditions.id) {
+  if(conditions[idAttr]) {
     // get by id
-    return hydrate(name, { id: conditions.id }, function(err, result) {
+    return hydrate(name, conditions[idAttr], function(err, result) {
       if(err) return onDone(err);
       if(result) {
         onDone(null, result);

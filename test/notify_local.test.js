@@ -84,7 +84,7 @@ exports['given two subscriptions to a model by id'] = {
       // console.log(self.collection.pluck('name'));
 
       self.collection.once('remove', function(model) {
-        assert.equal(model.get('id'), 1);
+        assert.equal(model.get('__id'), 1);
         process.nextTick(function() {
         // console.log(self.collection);
           assert.equal(self.collection.length, origLen - 1);

@@ -7,6 +7,7 @@ var Post = Backbone.Model.extend({
   url: 'http://localhost:8721/posts',
   plural: 'posts',
   collection: 'Posts',
+  idAttribute: '__id',
   rels: {
     'author': {
       type: 'Person'

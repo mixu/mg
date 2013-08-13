@@ -81,7 +81,7 @@ exports['hydrate associations...'] = {
     var self = this;
     this.ajaxCalls = [];
     cache._setAjax(fakeAjax({
-      posts: [ { id: 1, name: 'Posts1' }, { id: 555, name: 'Posts1' }, ],
+      posts: [ { __id: 1, name: 'Posts1' }, { __id: 555, name: 'Posts1' }, ],
       people: [ { id: 1000, name: 'Bar' } ],
       SimpleModel: [ 1, 2, 3 ].map(function(i) {
         return { id: i, name: 'Simple'+i };
@@ -228,14 +228,14 @@ exports['hydrate associations...'] = {
     'a model with an association': function(done) {
       var self = this;
       mmm.hydrate('Post', {
-          id: 1,
+          __id: 1,
           name: 'Foo',
           author: 1000
         }, function(err, val) {
         // console.log(val);
         assert.ok(val instanceof Model.Post);
         // check that the model id is correct
-        assert.equal(val.get('id'), 1);
+        assert.equal(val.get('__id'), 1);
         assert.equal(val.get('name'), 'Foo');
         // and the model contains a child model, author
         assert.ok(val.get('author') instanceof Model.Person);
@@ -250,17 +250,17 @@ exports['hydrate associations...'] = {
     'hydrate(..., id) is interpreted as hydrate(..., { id: id})': function(done) {
       mmm.hydrate('Post', 1, function(err, val) {
         assert.ok(val instanceof Model.Post);
-        assert.equal(val.get('id'), 1);
+        assert.equal(val.get('__id'), 1);
         done();
       });
     },
 
     'hydrating a empty array should return a collection': function(done) {
-      cache.store('Post', { id: 1000 });
+      cache.store('Post', { __id: 1000 });
 
-      mmm.hydrate('Post', { id: 1000, author: [] }, function(err, val) {
+      mmm.hydrate('Post', { __id: 1000, author: [] }, function(err, val) {
         assert.ok(val instanceof Model.Post);
-        assert.equal(val.get('id'), 1000);
+        assert.equal(val.get('__id'), 1000);
         assert.ok(val.get('author') instanceof Backbone.Collection);
         assert.equal(val.get('author').length, 0);
         done();
@@ -345,17 +345,17 @@ exports['hydrate associations...'] = {
     },
 
     'a model with a one to many relationship as a Collection': function(done) {
-      cache.store('Post', { id: 200 });
+      cache.store('Post', { __id: 200 });
       cache.store('Comment', { id: 100, value: 'C1' });
       cache.store('Comment', { id: 200, value: 'C2' });
 
       mmm.hydrate('Post', {
-          id: 200,
+          __id: 200,
           name: 'Foo',
           comments: [ 100, 200 ]
         }, function(err, val) {
         assert.ok(val instanceof Model.Post);
-        assert.equal(val.get('id'), 200);
+        assert.equal(val.get('__id'), 200);
         assert.equal(val.get('name'), 'Foo');
         var collection = val.get('comments');
         // console.log(collection);
@@ -369,7 +369,7 @@ exports['hydrate associations...'] = {
       var self = this;
       this.ajaxCalls = [];
       mmm.hydrate('Post', {
-          id: 1,
+          __id: 1,
           name: 'New post',
           author: 1000
         }, function(err, val) {
@@ -381,7 +381,7 @@ exports['hydrate associations...'] = {
         // with updated value
         assert.equal(val.get('name'), 'New post');
         // and the rest of the data is like before
-        assert.equal(val.get('id'), 1);
+        assert.equal(val.get('__id'), 1);
         assert.equal(val.get('author').get('name'), 'Bar');
 
         done();
@@ -395,7 +395,7 @@ exports['hydrate associations...'] = {
     // already-instantiated model (which also needs to be cached after the set has occurred)
 
     'if the data is a model instance, use it rather than creating a new instance, from cache': function(done) {
-      mmm.hydrate('Post', { id: 1 } , function(err, instance) {
+      mmm.hydrate('Post', { __id: 1 } , function(err, instance) {
         instance.set('Foo', 'bar');
         mmm.hydrate('Post', instance, function(err, val) {
           assert.strictEqual(instance, val);
@@ -421,7 +421,7 @@ exports['hydrate associations...'] = {
       var instance = new Model.Post();
       // adding an ID tempts the hydration layer to fetch it
       // this happens for real when saving -> success -> hydrate -> (parse) -> return
-      instance.set('id', 555);
+      instance.set('__id', 555);
       instance.set('Foo', 'bar');
       instance.set('author', 1000);
       assert.ok(instance instanceof Model.Post);

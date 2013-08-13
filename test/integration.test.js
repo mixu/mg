@@ -26,7 +26,7 @@ exports['given a simple model'] = {
 
   'can find by id': function(done) {
     mmm.findById('Post', 1, function(err, val) {
-      assert.equal(val.get('id'), 1);
+      assert.equal(val.get('__id'), 1);
       done();
     });
   },
@@ -34,7 +34,7 @@ exports['given a simple model'] = {
   'multiple find calls return same instance': function(done) {
     mmm.findById('Post', 1, function(err, val) {
       mmm.findById('Post', 1, function(err, val2) {
-        assert.equal(val.get('id'), 1);
+        assert.equal(val.get('__id'), 1);
         assert.strictEqual(val, val2);
         done();
       });
@@ -46,7 +46,7 @@ exports['given a simple model'] = {
       mmm.findById('Post', 1, function(err, val) {
         // console.log(util.inspect(val, false, 10, true));
         // check that the model id is correct
-        assert.equal(val.get('id'), 1);
+        assert.equal(val.get('__id'), 1);
         // and the model contains a child model, author
         assert.equal(val.get('author').get('name'), 'Bar');
         done();
@@ -56,7 +56,7 @@ exports['given a simple model'] = {
     'can hydrate a one-many relationship as a Collection': function(done) {
       // Post (id = 2) has many comments
       mmm.findById('Post', 2, function(err, val) {
-        assert.equal(val.get('id'), 2);
+        assert.equal(val.get('__id'), 2);
         var collection = val.get('comments');
         // console.log(util.inspect(collection, false, 10, true));
         assert.equal(collection.at(0).get('name'), 'C-1');
@@ -91,9 +91,9 @@ exports['given a simple model'] = {
   'findById(..., [ id1, id2 ], should work': function(done) {
     mmm.findById('Post', [1, 2], function(err, val) {
       assert.ok(Array.isArray(val));
-      assert.equal(val[0].get('id'), 1);
+      assert.equal(val[0].get('__id'), 1);
       assert.ok(val[0] instanceof Post);
-      assert.equal(val[1].get('id'), 2);
+      assert.equal(val[1].get('__id'), 2);
       assert.ok(val[1] instanceof Post);
       done();
     });
