@@ -26,7 +26,8 @@ if(typeof window == 'undefined') {
 // Define a correspondence between a name and a Model class (and metadata)
 exports.define = meta.define;
 exports.hydrate = hydrate;
-exports.hydrate2 = hydrate.hydrate2;
+exports.meta = meta;
+exports.cache = cache;
 
 // Query API
 
@@ -255,8 +256,7 @@ if(typeof window != 'undefined' && window.Cato) {
 // fetch the key value as-is
 exports.get = function(name, key) {
   if(arguments.length == 1) {
-    // disallowed so that there is more strict control
-    throw new Error('meta.get must be called with two parameters, direct lookup not supported.');
+    return meta[name];
   }
   if(meta[name] && meta[name][key]) {
     return meta[name][key];

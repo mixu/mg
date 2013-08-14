@@ -19,11 +19,19 @@ build:
 		--main index.js \
 		--out dist/mmm.js
 
+build-debug:
+	./node_modules/gluejs/bin/gluejs \
+		--include ./lib \
+		--include ./index.js \
+		--include ./node_modules/microee \
+		--replace backbone=window.Backbone \
+		--replace minilog=window.Minilog \
+		--global mmm \
+		--main index.js \
+		--source-url \
+		--out dist/mmm.js
+
 style:
 	jshint index.js server.js lib
 
-# disabled:
-#		--source-url \
-#		--nocommand 'uglifyjs --no-copyright' \
-
-.PHONY: test build case style
+.PHONY: test build build-debug style

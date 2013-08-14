@@ -20,7 +20,8 @@ if(typeof window == 'undefined') {
 // Define a correspondence between a name and a Model class (and metadata)
 exports.define = meta.define;
 exports.hydrate = hydrate;
-exports.hydrate2 = hydrate.hydrate2;
+exports.meta = meta;
+exports.cache = cache;
 
 // Query API
 
