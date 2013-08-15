@@ -135,8 +135,19 @@ exports.sync = function(name) {
  return function(op, model, opts) {
     log.info('sync', op, name+'='+model.id, model, opts);
 
-    // to hook up to the stream, bind on "create"
-    if(op == 'create') {
+    // to prevent circular dependencies from breaking JSON.stringify
+    // remove the rel keys from the object attrs
+    var rels = Object.keys(meta.get(name, 'rels'));
+    opts.attrs = {};
+    util.keys(model).forEach(function(key) {
+      if (rels.indexOf(key) === -1) {
+        opts.attrs[key] = util.get(model, key);
+      }
+    });
+
+    // "create", "update" and "patch" can cause an updated
+    // version of the model to be returned
+    if(op == 'create' || op == 'update' || op == 'patch') {
       var oldSuccess = opts.success;
       // must store the old success, since the content of the success function can vary
       opts.success = function(data) {
