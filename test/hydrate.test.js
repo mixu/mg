@@ -102,7 +102,7 @@ exports['hydrate associations...'] = {
   },
 
   beforeEach: function() {
-    this.h = new mmm.hydrate2();
+    this.h = new mmm.hydrate.hydrate2();
   },
 
   'deps': {

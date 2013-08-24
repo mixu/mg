@@ -453,10 +453,13 @@ exports.fetch = function(name, uri, onDone) {
   }
   function emit(err, result) {
     if(!callbacks[uri]) return;
-    callbacks[uri].forEach(function(onDone) {
+    var temp = callbacks[uri];
+    // delete before calling: otherwise, if fetch is called from a
+    // done callback, it will be queued and then ignored
+    delete callbacks[uri];
+    temp.forEach(function(onDone) {
       onDone(err, result);
     });
-    delete callbacks[uri];
   }
 
   if(!isPending) {

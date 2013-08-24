@@ -55,7 +55,7 @@ CollectionServer.prototype.addRest = function(collection) {
     // res.end(JSON.stringify(result));
   });
 
-  // add READ
+  // add READ by ID
   this.app.get(new RegExp('^/'+collection+'/(.+)$'), function(req, res, match) {
     var id = match[0];
     // Reading:
@@ -84,6 +84,20 @@ CollectionServer.prototype.addRest = function(collection) {
     });
     res.end();
   });
+
+  // add LIST / search
+  this.app.get(new RegExp('^/'+collection+'/?$'), function(req, res, match) {
+    var results = self.cache[collection];
+    if(results.length > 0) {
+      res.setHeader('Content-Type', 'application/json');
+      res.end(JSON.stringify(results));
+      return;
+    } else {
+      res.end();
+    }
+  });
+
+
 
   // add UPDATE
   this.app.put(new RegExp('^/'+collection+'/(.+)$'), function(req, res, match) {

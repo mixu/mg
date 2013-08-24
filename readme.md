@@ -1,4 +1,4 @@
-# mmm - a model synchronization library
+# m3 - a model synchronization library
 
 - Hydrates models with their 1:1 & 1:N associations. Models may be related to one or more other objects, and fetching each associated manually is painful.
 - Ensures that only one instance exists for each model class + id pair. This ensures that updates made to a model in one part of a system are reflected in another.
