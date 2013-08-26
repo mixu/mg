@@ -9,6 +9,7 @@ var assert = require('assert'),
     cache = require('../lib/cache.js');
 
 //require('minilog').suggest.deny(/mmm/, 'info');
+require('minilog').enable();
 
 exports['given a simple model'] = {
 
@@ -98,13 +99,24 @@ exports['given a simple model'] = {
     });
   },
 
-  'stream': {
-    'when streaming an obj w/collection twice, the 2nd instance\'s collection obj should be === to the 1st': function(done) {
-      require('minilog').enable();
+  'streaming a collection twice': {
+    'the 2nd instance\'s model obj should be === to the 1st': function(done) {
+      var collection = mmm.stream('Post', { }, function(err, value) {
+        // store the value now (since lookup can change due to hydration)
+        var beforeSecondCall = collection.get(1).get('author');
+        var collection2 = mmm.stream('Post', { }, function(err, value) {
+          assert.ok(collection.get(1).get('author') === collection2.get(1).get('author'));
+          assert.ok(beforeSecondCall === collection2.get(1).get('author'));
+          assert.ok(beforeSecondCall === collection.get(1).get('author'));
+          done();
+        });
+      });
+    },
+
+    'the 2nd instance\'s collection obj should be === to the 1st': function(done) {
       var collection = mmm.stream('Post', { }, function(err, value) {
         // store the value now (since lookup can change due to hydration)
         var beforeSecondCall = collection.get(2).get('comments');
-
         var collection2 = mmm.stream('Post', { }, function(err, value) {
           assert.ok(collection.get(2).get('comments') === collection2.get(2).get('comments'));
           assert.ok(beforeSecondCall === collection2.get(2).get('comments'));
@@ -112,12 +124,6 @@ exports['given a simple model'] = {
           done();
         });
       });
-      // for example: App.Posts[0 ... n].Comments[0 .. n]
-      // var a = mmm.stream('Post', {}, function() {}),
-      //     b = mmm.stream('Post', {}, function() {});
-      // a.at(0).get('comments').add({ name: 'test' });
-      // when a new comment is added,
-      // b.at(0).get('comments') should be updated and emit the right event
     }
 
   },
@@ -182,6 +188,7 @@ exports['given a simple model'] = {
 
     }
   }
+
 };
 
 // if this module is the script being run, then run the tests:
