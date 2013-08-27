@@ -427,7 +427,12 @@ exports.store = function(name, values) {
         log.debug('Updating values', name, id);
         // update the stored values, but do not change the object instance
         util.keys(value).forEach(function(key) {
-          util.set(cache[name][id], key, util.get(value, key));
+          var previous = util.get(cache[name][id], key),
+              updated = util.get(value, key);
+          if(previous !== updated) {
+            log.debug('Update: set', name, id, key, updated);
+            util.set(cache[name][id], key, updated);
+          }
         });
         return;
       } else {
@@ -690,6 +695,29 @@ Hydration.prototype.add = function(name, id) {
   return true;
 };
 
+function override(name, old, newer) {
+  var rels = meta.get(name, 'rels');
+  util.keys(newer).forEach(function(key) {
+    var idAttr, oldVal, newVal, relType, isCollection;
+    oldVal = util.get(old, key);
+    newVal = util.get(newer, key);
+    isCollection = !!(oldVal && oldVal.add);
+    // except if:
+    if(rels && rels[key]) {
+      idAttr = meta.get(rels[key].type, 'idAttribute') || 'id';
+      if(typeof newVal != 'object' && util.get(oldVal, idAttr) == newVal) {
+        // 1) the key is a rel and the old value is a instance of a model with the right id
+        return;
+      } else if(Array.isArray(newVal) && isCollection) {
+        // 2) the key is a rel and the old value is a collection with the right ids (in any order)
+        return;
+      }
+    }
+    // override the value
+    util.set(old, key, util.get(newer, key));
+  });
+}
+
 // run the next fetch, merge with the input cache,
 // discover dependcies and update the queue
 Hydration.prototype.next = function(done) {
@@ -711,20 +739,15 @@ Hydration.prototype.next = function(done) {
     if(self.inputCache[name] && self.inputCache[name][id]) {
       var modelClass = meta.model(name);
       log.info('Override values for:', name, id);
+      log.debug(result, self.inputCache[name][id]);
       if (self.inputCache[name][id] instanceof modelClass) {
-        // if the input is an instance, then reuse it
-        util.keys(result).forEach(function(key) {
-          if(typeof util.get(self.inputCache[name][id], key) === 'undefined') {
-            util.set(self.inputCache[name][id], key, util.get(result, key));
-          }
-        });
+        // if the model in the input cache is an instance, we must reuse it
+        override(name, self.inputCache[name][id], result);
         // to avoid creating duplicates when the model instance already exists
         result = self.inputCache[name][id];
       } else {
-        // default to using the cached model as the basis
-        util.keys(self.inputCache[name][id]).forEach(function(key) {
-          util.set(result, key, util.get(self.inputCache[name][id], key));
-        });
+        // default to using the cache result model as the basis
+        override(name, result, self.inputCache[name][id]);
       }
     }
     if(!self.cache[name]) {
@@ -752,6 +775,9 @@ Hydration.prototype.linkRel = function(name, instance) {
   var rels = meta.get(name, 'rels'),
         idAttr = meta.get(name, 'idAttribute') || 'id';
   log.info('LinkRels', name, get(instance, idAttr), rels);
+
+  // console.log(require('util').inspect(instance, null, 3, true));
+
   // shortcut if no rels to consider
   if(!rels) return instance;
   // for each key-value pair, run the eachFn
