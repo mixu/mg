@@ -10,7 +10,7 @@ var cache = require('./lib/cache.js'),
     Stream = require('./lib/stream.js'),
     Backbone = require('backbone'),
     ajax = require('./lib/ajax.js'),
-    log = require('minilog')('mmm'),
+    log = require('minilog')('mg'),
     util = require('./lib/util.js');
 
 if(typeof window == 'undefined') {
@@ -41,7 +41,7 @@ function listRemote(name, onDone) {
   var uri = cache.uri(name);
   log.info('listRemote', name, uri);
   if(!uri) {
-    console.error('Unknown mmm.stream URL: ' +name);
+    console.error('Unknown mg.stream URL: ' +name);
   }
   cache.fetch(name, uri, function(err, data) {
     // apply hydration to the remote items
@@ -111,7 +111,7 @@ exports.stream = function(name, conditions, onLoaded) {
     onLoaded && onLoaded(null, instance);
 
     Stream.on(name, 'destroy', function(model) {
-        log.info('mmm.stream remove collection', instance.id, model.id);
+        log.info('mg.stream remove collection', instance.id, model.id);
         instance.remove(model);
         // Can't seem to get the model.destroy to trigger the instance.remove event
         // Not really sure why it doesn't go through to Backbone.
@@ -122,7 +122,7 @@ exports.stream = function(name, conditions, onLoaded) {
     // subscribe to local "on-fetch-or-save" (with filter)
     // if remote subscription is supported, do that as well
     Stream.on(name, 'available', function(model) {
-      log.info('mmm.stream available', model.id, model.get('name'));
+      log.info('mg.stream available', model.id, model.get('name'));
       instance.add(model);
     });
   });
@@ -254,7 +254,7 @@ function ajaxFetch(uri, callback) {
 module.exports = (typeof window == 'undefined' ? fetch : ajaxFetch);
 },
 "lib/meta.js": function(module, exports, require){
-var log = require('minilog')('mmm/meta'),
+var log = require('minilog')('mg/meta'),
     Collection = require('backbone').Collection;
 
 var meta = {},
@@ -350,7 +350,7 @@ var Stream = require('./stream.js'),
     ajax = require('./ajax.js'),
     meta = require('./meta.js'),
     util = require('./util.js'),
-    log = require('minilog')('mmm/cache');
+    log = require('minilog')('mg/cache');
 
 var cache = {},
     callbacks = {};
@@ -499,7 +499,7 @@ exports.clear = function() {
 },
 "lib/stream.js": function(module, exports, require){
 var MicroEE = require('microee'),
-    log = require('minilog')('mmm/stream');
+    log = require('minilog')('mg/stream');
 // Single point to get events about models of a particular type.
 //
 // Note that creating models and then manually assigning ID's to them is not supported
@@ -591,7 +591,7 @@ var cache = require('./cache.js'),
     meta = require('./meta.js'),
     util = require('./util.js'),
     Collection = require('backbone').Collection,
-    log = require('minilog')('mmm/hydration'),
+    log = require('minilog')('mg/hydration'),
     get = util.get;
 
 module.exports = function hydrate(name, models, onDone) {
@@ -739,7 +739,6 @@ Hydration.prototype.next = function(done) {
     if(self.inputCache[name] && self.inputCache[name][id]) {
       var modelClass = meta.model(name);
       log.info('Override values for:', name, id);
-      log.debug(result, self.inputCache[name][id]);
       if (self.inputCache[name][id] instanceof modelClass) {
         // if the model in the input cache is an instance, we must reuse it
         override(name, self.inputCache[name][id], result);
@@ -775,9 +774,6 @@ Hydration.prototype.linkRel = function(name, instance) {
   var rels = meta.get(name, 'rels'),
         idAttr = meta.get(name, 'idAttribute') || 'id';
   log.info('LinkRels', name, get(instance, idAttr), rels);
-
-  // console.log(require('util').inspect(instance, null, 3, true));
-
   // shortcut if no rels to consider
   if(!rels) return instance;
   // for each key-value pair, run the eachFn
@@ -1054,5 +1050,5 @@ module.exports = {
   "_id": "microee@0.0.2",
   "_from": "microee@0.0.2"
 };}};
-mmm = require('index.js');
+mg = require('index.js');
 }());
