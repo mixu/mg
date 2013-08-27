@@ -1,4 +1,4 @@
-# mmm testing plan
+# mg testing plan
 
 - Implement a .get() function that supports paths so that long chains of gets do not need a million checks
   - Ensure that if the field is type:string but empty, the result is an empty string

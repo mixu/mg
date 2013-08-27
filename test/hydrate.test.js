@@ -1,6 +1,6 @@
 var assert = require('assert'),
     util = require('util'),
-    mmm = require('mmm'),
+    mg = require('mg'),
     Backbone = require('backbone'),
     Model = require('./lib/models.js'),
     cache = require('../lib/cache.js'),
@@ -12,37 +12,37 @@ require('minilog').enable();
 // Model definitions
 var SimpleModel = Backbone.Model.extend({
   url: 'http://test/SimpleModel',
-  sync: mmm.sync('SimpleModel')
+  sync: mg.sync('SimpleModel')
 });
-mmm.define('SimpleModel', SimpleModel);
+mg.define('SimpleModel', SimpleModel);
 
 var ModelWithChild = Backbone.Model.extend({
   url: 'http://test/ModelWithChild',
-  sync: mmm.sync('ModelWithChild'),
+  sync: mg.sync('ModelWithChild'),
   rels: {
     child: { type: 'SimpleModel' }
   }
 });
-mmm.define('ModelWithChild', ModelWithChild);
+mg.define('ModelWithChild', ModelWithChild);
 
 var ModelWithGrandChild = Backbone.Model.extend({
   url: 'http://test/ModelWithGrandChild',
-  sync: mmm.sync('ModelWithGrandChild'),
+  sync: mg.sync('ModelWithGrandChild'),
   rels: {
     child: { type: 'ModelWithChild' }
   }
 });
-mmm.define('ModelWithGrandChild', ModelWithGrandChild);
+mg.define('ModelWithGrandChild', ModelWithGrandChild);
 
 exports['hydrate values...'] = {
   'date string as date object': function() {
     var WithDate = Backbone.Model.extend({
-      sync: mmm.sync('WithDate'),
+      sync: mg.sync('WithDate'),
       rels: {
         'date': { type: Date }
       }
     });
-    mmm.define('WithDate', WithDate);
+    mg.define('WithDate', WithDate);
   },
 
   'empty date as a 1970\'s date object': function() {
@@ -51,12 +51,12 @@ exports['hydrate values...'] = {
 
   'regexp string as regexp object': function() {
     var WithRe = Backbone.Model.extend({
-      sync: mmm.sync('WithRe'),
+      sync: mg.sync('WithRe'),
       rels: {
         're': { type: RegExp }
       }
     });
-    mmm.define('WithRe', WithRe);
+    mg.define('WithRe', WithRe);
   },
 
   'empty regexp as regexp object': function() {
@@ -65,12 +65,12 @@ exports['hydrate values...'] = {
 
   'hydrate a default value': function() {
     var WithDefault = Backbone.Model.extend({
-      sync: mmm.sync('WithDefault'),
+      sync: mg.sync('WithDefault'),
       rels: {
         'foo': { type: String, default: 'bar' }
       }
     });
-    mmm.define('WithDefault', WithDefault);
+    mg.define('WithDefault', WithDefault);
 
   }
 };
@@ -102,7 +102,7 @@ exports['hydrate associations...'] = {
   },
 
   beforeEach: function() {
-    this.h = new mmm.hydrate.hydrate2();
+    this.h = new mg.hydrate.hydrate2();
   },
 
   'deps': {
@@ -205,7 +205,7 @@ exports['hydrate associations...'] = {
   'hydrate': {
 
     'a model with no associations': function(done) {
-      mmm.hydrate('Comment', { text: 'foo' }, function(err, comment) {
+      mg.hydrate('Comment', { text: 'foo' }, function(err, comment) {
         assert.ok(comment instanceof Model.Comment);
         assert.equal(comment.get('text'), 'foo');
         done();
@@ -213,7 +213,7 @@ exports['hydrate associations...'] = {
     },
 
     'an array of no-assoc models': function(done) {
-      mmm.hydrate('Comment', [ { text: 'foo' }, { text: 'bar' } ], function(err, results) {
+      mg.hydrate('Comment', [ { text: 'foo' }, { text: 'bar' } ], function(err, results) {
         assert.ok(Array.isArray(results));
         assert.ok(results[0] instanceof Model.Comment);
         assert.equal(results[0].get('text'), 'foo');
@@ -227,7 +227,7 @@ exports['hydrate associations...'] = {
 
     'a model with an association': function(done) {
       var self = this;
-      mmm.hydrate('Post', {
+      mg.hydrate('Post', {
           __id: 1,
           name: 'Foo',
           author: 1000
@@ -248,7 +248,7 @@ exports['hydrate associations...'] = {
     },
 
     'hydrate(..., id) is interpreted as hydrate(..., { id: id})': function(done) {
-      mmm.hydrate('Post', 1, function(err, val) {
+      mg.hydrate('Post', 1, function(err, val) {
         assert.ok(val instanceof Model.Post);
         assert.equal(val.get('__id'), 1);
         done();
@@ -258,7 +258,7 @@ exports['hydrate associations...'] = {
     'hydrating a empty array should return a collection': function(done) {
       cache.store('Post', { __id: 1000 });
 
-      mmm.hydrate('Post', { __id: 1000, author: [] }, function(err, val) {
+      mg.hydrate('Post', { __id: 1000, author: [] }, function(err, val) {
         assert.ok(val instanceof Model.Post);
         assert.equal(val.get('__id'), 1000);
         assert.ok(val.get('author') instanceof Backbone.Collection);
@@ -269,15 +269,15 @@ exports['hydrate associations...'] = {
 
     'a model with two associations': function(done) {
       var AAA = Backbone.Model.extend({
-        sync: mmm.sync('AAA'),
+        sync: mg.sync('AAA'),
         rels: {
           'first': { type: 'ModelWithChild' },
           'second': { type: 'SimpleModel' }
         }
       });
-      mmm.define('AAA', AAA);
+      mg.define('AAA', AAA);
 
-      mmm.hydrate('AAA', {
+      mg.hydrate('AAA', {
         name: 'AAA',
         first: 1,
         second: 2
@@ -296,7 +296,7 @@ exports['hydrate associations...'] = {
     },
 
     'a model with an association that has a child association': function(done) {
-      mmm.hydrate('ModelWithGrandChild', {
+      mg.hydrate('ModelWithGrandChild', {
         name: 'OP',
         child: 1
       }, function(err, model) {
@@ -317,24 +317,24 @@ exports['hydrate associations...'] = {
     'a model with a circular association': function(done) {
       var FFF = Backbone.Model.extend({
         url: 'http://test/FFF/',
-        sync: mmm.sync('FFF'),
+        sync: mg.sync('FFF'),
         rels: {
           child: { type: 'GGG' }
         }
       });
-      mmm.define('FFF', FFF);
+      mg.define('FFF', FFF);
       var GGG = Backbone.Model.extend({
         url: 'http://test/GGG',
-        sync: mmm.sync('GGG'),
+        sync: mg.sync('GGG'),
         rels: {
           parent: { type: 'FFF' }
         }
       });
-      mmm.define('GGG', GGG);
+      mg.define('GGG', GGG);
 
       cache.store('GGG', { id: 6000, name: 'GGG', parent: 5000 });
 
-      mmm.hydrate('FFF', { id: 5000, name: 'FFF', child: 6000 }, function(err, model) {
+      mg.hydrate('FFF', { id: 5000, name: 'FFF', child: 6000 }, function(err, model) {
         // console.log(util.inspect(model, null, 30, true));
         assert.equal('FFF', model.get('name'));
         var a = model.get('child');
@@ -349,7 +349,7 @@ exports['hydrate associations...'] = {
       cache.store('Comment', { id: 100, value: 'C1' });
       cache.store('Comment', { id: 200, value: 'C2' });
 
-      mmm.hydrate('Post', {
+      mg.hydrate('Post', {
           __id: 200,
           name: 'Foo',
           comments: [ 100, 200 ]
@@ -368,7 +368,7 @@ exports['hydrate associations...'] = {
     'if the model to be hydrated exists in cache, then update and reuse the cached model': function(done) {
       var self = this;
       this.ajaxCalls = [];
-      mmm.hydrate('Post', {
+      mg.hydrate('Post', {
           __id: 1,
           name: 'New post',
           author: 1000
@@ -395,9 +395,9 @@ exports['hydrate associations...'] = {
     // already-instantiated model (which also needs to be cached after the set has occurred)
 
     'if the data is a model instance, use it rather than creating a new instance, from cache': function(done) {
-      mmm.hydrate('Post', { __id: 1 } , function(err, instance) {
+      mg.hydrate('Post', { __id: 1 } , function(err, instance) {
         instance.set('Foo', 'bar');
-        mmm.hydrate('Post', instance, function(err, val) {
+        mg.hydrate('Post', instance, function(err, val) {
           assert.strictEqual(instance, val);
           assert.equal(val.get('Foo'), 'bar');
           done();
@@ -409,7 +409,7 @@ exports['hydrate associations...'] = {
       var instance = new Model.Post();
       instance.set('Foo', 'bar');
       instance.set('author', 1000);
-      mmm.hydrate('Post', instance, function(err, val) {
+      mg.hydrate('Post', instance, function(err, val) {
         assert.ok(instance === val);
         assert.equal(val.get('Foo'), 'bar');
         assert.equal(val.get('author').get('name'), 'Bar');
@@ -425,7 +425,7 @@ exports['hydrate associations...'] = {
       instance.set('Foo', 'bar');
       instance.set('author', 1000);
       assert.ok(instance instanceof Model.Post);
-      mmm.hydrate('Post', instance, function(err, val) {
+      mg.hydrate('Post', instance, function(err, val) {
         assert.ok(val instanceof Model.Post);
         assert.strictEqual(instance, val);
         assert.equal(val.get('Foo'), 'bar');

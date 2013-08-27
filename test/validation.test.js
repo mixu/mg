@@ -1,6 +1,6 @@
 var assert = require('assert'),
     util = require('util'),
-    mmm = require('mmm'),
+    mg = require('mg'),
     Backbone = require('backbone'),
     Model = require('./lib/models.js'),
     cache = require('../lib/cache.js'),
@@ -18,12 +18,12 @@ var ValidatorError = null;
 exports['validation'] = {
 
   'invalid arguments are rejected': function() {
-    mmm.define('Foo', { rels: { bar: { type: String, validation: 'nope' } }});
-    mmm.define('Foo', { rels: { bar: { type: String, validation: [ 'nope' ] } }});
+    mg.define('Foo', { rels: { bar: { type: String, validation: 'nope' } }});
+    mg.define('Foo', { rels: { bar: { type: String, validation: [ 'nope' ] } }});
   },
 
   'string - required': function() {
-    mmm.define('Foo', { rels: { bar: { type: String, required: true } }});
+    mg.define('Foo', { rels: { bar: { type: String, required: true } }});
     assert.ok(new Foo({ id: 1, bar: null }).validate() instanceof ValidatorError);
     assert.ok(new Foo({ id: 1, bar: undefined }).validate() instanceof ValidatorError);
     assert.ok(new Foo({ id: 1, bar: '' }).validate() instanceof ValidatorError);
@@ -31,7 +31,7 @@ exports['validation'] = {
   },
 
   'string - enum': function() {
-    mmm.define('Foo', { rels: { bar: { type: String, enum: ['a', 'b', undefined, 'c', null] } }});
+    mg.define('Foo', { rels: { bar: { type: String, enum: ['a', 'b', undefined, 'c', null] } }});
 
     ['d', true, 10, {}].forEach(function(value) {
       assert.ok(new Foo({ bar: value }).validate() instanceof ValidatorError);
@@ -39,14 +39,14 @@ exports['validation'] = {
   },
 
   'string - regexp': function() {
-    mmm.define('Foo', { rels: { bar: { type: String, match: /[a-z]/ } }});
+    mg.define('Foo', { rels: { bar: { type: String, match: /[a-z]/ } }});
     assert.equal(1, Foo.validators.length);
     assert.ok(new Foo({ bar: 'az' }).validate());
     assert.ok(new Foo({ bar: 'aZ' }).validate() instanceof ValidatorError);
   },
 
   'number - min max': function() {
-    mmm.define('Foo', { rels: { bar: { type: Number, max: 15, min: 5 } }});
+    mg.define('Foo', { rels: { bar: { type: Number, max: 15, min: 5 } }});
 
     assert.ok(new Foo({ bar: 10 }).validate());
 
@@ -62,7 +62,7 @@ exports['validation'] = {
   },
 
   'number - required': function() {
-    mmm.define('Foo', { rels: { bar: { type: Number, required: true } }});
+    mg.define('Foo', { rels: { bar: { type: Number, required: true } }});
     assert.ok(new Foo({ id: 1, bar: null }).validate() instanceof ValidatorError);
     assert.ok(new Foo({ id: 1, bar: undefined }).validate() instanceof ValidatorError);
     assert.ok(new Foo({ id: 1, bar: '' }).validate() instanceof ValidatorError);
@@ -72,14 +72,14 @@ exports['validation'] = {
   },
 
   'date - required': function() {
-    mmm.define('Foo', { rels: { bar: { type: Date, required: true } }});
+    mg.define('Foo', { rels: { bar: { type: Date, required: true } }});
     assert.ok(new Foo({ id: 1, bar: null }).validate() instanceof ValidatorError);
     assert.ok(new Foo({ id: 1, bar: undefined }).validate() instanceof ValidatorError);
     assert.ok(new Foo({ id: 1, bar: new Date() }).validate());
   },
 
   'boolean - required': function() {
-    mmm.define('Foo', { rels: { bar: { type: Date, required: true } }});
+    mg.define('Foo', { rels: { bar: { type: Date, required: true } }});
     assert.ok(new Foo({ id: 1, bar: null }).validate() instanceof ValidatorError);
     assert.ok(new Foo({ id: 1, bar: undefined }).validate() instanceof ValidatorError);
     assert.ok(new Foo({ id: 1, bar: false }).validate());

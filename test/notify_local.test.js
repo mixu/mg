@@ -1,12 +1,12 @@
 var assert = require('assert'),
     util = require('util'),
     http = require('http'),
-    mmm = require('mmm'),
+    mg = require('mg'),
     server = require('./lib/test_server.js'),
     Post = require('./lib/models.js').Post,
     Backbone = require('backbone');
 
-// require('./lib/dataset.js')(mmm);
+// require('./lib/dataset.js')(mg);
 
 require('minilog').enable();
 
@@ -19,13 +19,13 @@ exports['given two subscriptions to a model by id'] = {
     }).listen(8721).on('listening', function() {
 
       // create direct subscription
-      mmm.findById('Post', 1, function(err, val) {
+      mg.findById('Post', 1, function(err, val) {
         if (err) throw err;
         self.model = val;
         // create wildcard subscription on all models of a type
         // => collection subscriptions are filtered versions of this
 
-        self.collection = mmm.stream('Post', { }, function() {
+        self.collection = mg.stream('Post', { }, function() {
           // console.log(util.inspect(self.collection.models, null, 3, true));
           done();
         });
@@ -47,7 +47,7 @@ exports['given two subscriptions to a model by id'] = {
         done();
       });
 
-      mmm.findById('Post', 1, function(err, val) {
+      mg.findById('Post', 1, function(err, val) {
         // note that Backbone only triggers "change" when the new value is different from the old one
         val.set('name', 'FooBar');
       });
@@ -92,7 +92,7 @@ exports['given two subscriptions to a model by id'] = {
         });
       });
 
-      mmm.findById('Post', 1, function(err, val) {
+      mg.findById('Post', 1, function(err, val) {
         val.destroy();
       });
     }

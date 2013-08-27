@@ -1,8 +1,8 @@
 var Backbone = require('backbone'),
-    mmm = require('mmm');
+    mg = require('mg');
 
 var Post = Backbone.Model.extend({
-  sync: mmm.sync('Post'),
+  sync: mg.sync('Post'),
   type: 'Post',
   url: 'http://localhost:8721/posts',
   plural: 'posts',
@@ -18,30 +18,30 @@ var Post = Backbone.Model.extend({
   }
 });
 
-mmm.define('Post', Post);
+mg.define('Post', Post);
 
 var Posts = Backbone.Collection.extend({
   // additional property
   special: true
 });
 
-mmm.define('Posts', Posts);
+mg.define('Posts', Posts);
 
 var Person = Backbone.Model.extend({
-  sync: mmm.sync('Person'),
+  sync: mg.sync('Person'),
   url: 'http://localhost:8721/people',
   plural: 'people'
 });
 
-mmm.define('Person', Person);
+mg.define('Person', Person);
 
 var Comment = Backbone.Model.extend({
-  sync: mmm.sync('Comment'),
+  sync: mg.sync('Comment'),
   url: 'http://localhost:8721/comments',
   plural: 'comments'
 });
 
-mmm.define('Comment', Comment);
+mg.define('Comment', Comment);
 
 module.exports = {
   Post: Post,

@@ -15,9 +15,9 @@ build:
 		--include ./node_modules/microee \
 		--replace backbone=window.Backbone \
 		--replace minilog=window.Minilog \
-		--global mmm \
+		--global mg \
 		--main index.js \
-		--out dist/mmm.js
+		--out dist/mg.js
 
 build-debug:
 	./node_modules/gluejs/bin/gluejs \
@@ -26,10 +26,10 @@ build-debug:
 		--include ./node_modules/microee \
 		--replace backbone=window.Backbone \
 		--replace minilog=window.Minilog \
-		--global mmm \
+		--global mg \
 		--main index.js \
 		--source-url \
-		--out dist/mmm.js
+		--out dist/mg.js
 
 style:
 	jshint index.js server.js lib

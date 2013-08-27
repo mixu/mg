@@ -4,7 +4,7 @@ var cache = require('./lib/cache.js'),
     Stream = require('./lib/stream.js'),
     Backbone = require('backbone'),
     ajax = require('./lib/ajax.js'),
-    log = require('minilog')('mmm'),
+    log = require('minilog')('mg'),
     util = require('./lib/util.js');
 
 if(typeof window == 'undefined') {
@@ -35,7 +35,7 @@ function listRemote(name, onDone) {
   var uri = cache.uri(name);
   log.info('listRemote', name, uri);
   if(!uri) {
-    console.error('Unknown mmm.stream URL: ' +name);
+    console.error('Unknown mg.stream URL: ' +name);
   }
   cache.fetch(name, uri, function(err, data) {
     // apply hydration to the remote items
@@ -105,7 +105,7 @@ exports.stream = function(name, conditions, onLoaded) {
     onLoaded && onLoaded(null, instance);
 
     Stream.on(name, 'destroy', function(model) {
-        log.info('mmm.stream remove collection', instance.id, model.id);
+        log.info('mg.stream remove collection', instance.id, model.id);
         instance.remove(model);
         // Can't seem to get the model.destroy to trigger the instance.remove event
         // Not really sure why it doesn't go through to Backbone.
@@ -116,7 +116,7 @@ exports.stream = function(name, conditions, onLoaded) {
     // subscribe to local "on-fetch-or-save" (with filter)
     // if remote subscription is supported, do that as well
     Stream.on(name, 'available', function(model) {
-      log.info('mmm.stream available', model.id, model.get('name'));
+      log.info('mg.stream available', model.id, model.get('name'));
       instance.add(model);
     });
   });

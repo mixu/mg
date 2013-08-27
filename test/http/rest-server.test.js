@@ -1,5 +1,5 @@
 var assert = require('assert'),
-    mmm = require('mmm'),
+    mg = require('mg'),
     http = require('http');
 
 var server = require('./lib/test_server.js'),

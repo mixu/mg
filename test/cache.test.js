@@ -1,6 +1,6 @@
 var assert = require('assert'),
     util = require('util'),
-    mmm = require('mmm'),
+    mg = require('mg'),
     Model = require('./lib/models.js'),
     cache = require('../lib/cache.js'),
     Backbone = require('backbone');
@@ -10,8 +10,8 @@ require('minilog').enable();
 exports['test cache'] = {
 
   before: function() {
-    mmm.define('test', Backbone.Model.extend({
-      sync: mmm.sync('test'),
+    mg.define('test', Backbone.Model.extend({
+      sync: mg.sync('test'),
       type: 'test',
       url: 'http://localhost:7000/test/'
     }));
@@ -95,8 +95,8 @@ exports['test cache'] = {
 
   'can cache an model with a different idAttribute': function(done) {
     var item = { __id: 7000, name: 'foo' };
-    mmm.define('AttrTest', Backbone.Model.extend({
-      sync: mmm.sync('AttrTest'),
+    mg.define('AttrTest', Backbone.Model.extend({
+      sync: mg.sync('AttrTest'),
       type: 'AttrTest',
       idAttribute: '__id',
       url: 'http://'
