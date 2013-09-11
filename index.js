@@ -131,13 +131,16 @@ exports.sync = function(name) {
 
     // to prevent circular dependencies from breaking JSON.stringify
     // remove the rel keys from the object attrs
-    var rels = Object.keys(meta.get(name, 'rels'));
-    opts.attrs = {};
-    util.keys(model).forEach(function(key) {
-      if (rels.indexOf(key) === -1) {
-        opts.attrs[key] = util.get(model, key);
-      }
-    });
+    var rels = meta.get(name, 'rels');
+    if(rels) {
+      rels = Object.keys(rels);
+      opts.attrs = {};
+      util.keys(model).forEach(function(key) {
+        if (rels.indexOf(key) === -1) {
+          opts.attrs[key] = util.get(model, key);
+        }
+      });
+    }
 
     // "create", "update" and "patch" can cause an updated
     // version of the model to be returned
