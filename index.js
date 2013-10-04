@@ -200,10 +200,3 @@ exports.sync = function(name) {
     return Backbone.sync.apply(this, arguments);
   };
 };
-
-// basically, just plucks out the right thing from the output
-exports.parse = function(name) {
-  return function(resp, options) {
-    return resp;
-  };
-};

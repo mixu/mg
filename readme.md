@@ -1,4 +1,4 @@
-# m3 - a model synchronization library
+# mg - a model synchronization library
 
 - Hydrates models with their 1:1 & 1:N associations. Models may be related to one or more other objects, and fetching each associated manually is painful.
 - Ensures that only one instance exists for each model class + id pair. This ensures that updates made to a model in one part of a system are reflected in another.
@@ -12,17 +12,17 @@
 
 ## Getting started
 
-`m3` uses regular Backbone models, but adds a few additional properties, a model registry and a model cache. To set up `m3` hydration, define additional properties on the model and set the `sync` function. For example:
+`mg` uses regular Backbone models, but adds a few additional properties, a model registry and a model cache. To set up `mg` hydration, define additional properties on the model and set the `sync` function. For example:
 
     var Post = Backbone.Model.extend({
-      sync: m3.sync('Post')
+      sync: mg.sync('Post')
     });
 
-    m3.define('Post', Post);
+    mg.define('Post', Post);
 
-The `sync` function is added so that `m3` can intercept `model.sync()`, allowing it to detect when new models are created.
+The `sync` function is added so that `mg` can intercept `model.sync()`, allowing it to detect when new models are created.
 
-The `m3.define()` call registers the model with hydration, so that relations can find the right model class and metadata.
+The `mg.define()` call registers the model with hydration, so that relations can find the right model class and metadata.
 
 ## Defining relations
 
@@ -34,13 +34,13 @@ To define relations, define the type of the related model on `.rels["keyname"]`.
       }
     });
 
-    m3.define('Post', Post);
+    mg.define('Post', Post);
 
-`m3` supports both one-to-one, one-to-many and many-to-one relations. You do not need to explicitly define the type of relation, as it will be inferred from the JSON data.
+`mg` supports both one-to-one, one-to-many and many-to-one relations. You do not need to explicitly define the type of relation, as it will be inferred from the JSON data.
 
 For example, given the following JSON data, a one-to-one relation is detected:
 
-    m3.hydrate('Post', {
+    mg.hydrate('Post', {
       id: 1,
       author: 1000
     }, function(err, model) { ... });
@@ -49,7 +49,7 @@ This would be hydrated with `.get('author')` set to the Person with `id=1000`. I
 
 Given the following JSON data, a one-to-many relation is detected:
 
-    m3.hydrate('Post', {
+    mg.hydrate('Post', {
       id: 1,
       author: [ 200, 300 ]
     }, function(err, model) { ... });
@@ -99,14 +99,14 @@ By default, collections of Post models are contained inside a Backbone.Collectio
       collection: 'Posts',
     });
 
-    m3.define('Post', Post);
+    mg.define('Post', Post);
 
     var Posts = Backbone.Collection.extend({
       // additional property
       special: true
     });
 
-    m3.define('Posts', Posts);
+    mg.define('Posts', Posts);
 
 ## Validation API
 
@@ -132,18 +132,18 @@ To validate:
 
 ## Creating / reading / updating / deleting
 
-How `m3` hooks into CRUD:
+How `mg` hooks into CRUD:
 
-- Create: `m3` uses the `.sync` function to get notified of newly created instances once the backend returns a response that contains an id. These models are added to the cache, and any streaming collections are notified.
-- Read: `m3` provides the `.find` and `.hydrate` APIs for reading in and hydrating related models
-- Update: the normal `Backbone.sync` behavior takes place. Since `m3` ensures that only one instance of a class + id pair exists on the client side, any updates trigger events on the same instance of the model. For properties that are models or collections of models, `m3` hooks into the `.save` and triggers a save on the related collection or model (one level deep).
-- Delete: `m3` should also remove the model from all collections and remove it from the cache.
+- Create: `mg` uses the `.sync` function to get notified of newly created instances once the backend returns a response that contains an id. These models are added to the cache, and any streaming collections are notified.
+- Read: `mg` provides the `.find` and `.hydrate` APIs for reading in and hydrating related models
+- Update: the normal `Backbone.sync` behavior takes place. Since `mg` ensures that only one instance of a class + id pair exists on the client side, any updates trigger events on the same instance of the model. For properties that are models or collections of models, `mg` hooks into the `.save` and triggers a save on the related collection or model (one level deep).
+- Delete: `mg` should also remove the model from all collections and remove it from the cache.
 
 ## Save API
 
 Saving collection add/remove actions; should be done when the model containing the relation collection is saved.
 
-For properties that are models or collections of models, `m3` hooks into the `.save` and triggers a save on the related collection or model (one level deep).
+For properties that are models or collections of models, `mg` hooks into the `.save` and triggers a save on the related collection or model (one level deep).
 
 ## Cache API
 
@@ -167,13 +167,13 @@ If a request is already pending to a particular URL, then the cache will not sta
 
     module.exports = {
       // inline define
-      Post: m3.define('Post', Backbone.Model.extend({
-        sync: m3.sync('Post'),
+      Post: mg.define('Post', Backbone.Model.extend({
+        sync: mg.sync('Post'),
         plural: 'posts'
       })),
       // easier getter
       posts: function(conditions, onDone) {
-        return m3.find('Post', conditions, onDone);
+        return mg.find('Post', conditions, onDone);
       }
     };
 
