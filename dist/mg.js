@@ -108,7 +108,9 @@ exports.stream = function(name, conditions, onLoaded) {
       instance.add(results);
     }
 
-    onLoaded && onLoaded(null, instance);
+    if(typeof onLoaded === 'function') {
+      onLoaded(null, instance);
+    }
 
     Stream.on(name, 'destroy', function(model) {
         log.info('mg.stream remove collection', instance.id, model.id);
@@ -206,13 +208,6 @@ exports.sync = function(name) {
     return Backbone.sync.apply(this, arguments);
   };
 };
-
-// basically, just plucks out the right thing from the output
-exports.parse = function(name) {
-  return function(resp, options) {
-    return resp;
-  };
-};
 },
 "lib/ajax.js": function(module, exports, require){
 if(typeof window == 'undefined') {
@@ -277,13 +272,6 @@ exports.get = function(name, key) {
   }
 };
 
-// also evaluate the result if it's a function
-exports.result = function(name, key) {
-  var value = exports.get(name, key);
-  // if a property is a function, evaluate it
-  return (typeof value === 'function' ? value.call(meta[name]) : value);
-};
-
 // get the model class for the given name
 exports.model = function(name) {
   if(!model[name]) throw new Error(name + ' does not have a definition.');
@@ -324,7 +312,10 @@ exports.define = function(name, mmeta) {
 
 },
 "lib/util.js": function(module, exports, require){
-// call getter if it exists, otherwise return property
+// Makes it easier to work with things that are either
+// plain objects (direct access via obj[key]) or Backbone models
+// (access via obj.get(key)). Calls the getter if it exists,
+// otherwise returns the property.
 exports.get = function(obj, key) {
   if(!obj) return '';
   if(typeof obj.get == 'function') {
@@ -332,6 +323,14 @@ exports.get = function(obj, key) {
   } else {
     return obj[key];
   }
+};
+
+// Similar to `_.result`: If the value of the named property is a function
+// then invoke it with the object as context; otherwise, return it.
+exports.result = function(obj, key) {
+  if(!obj) return '';
+  // if a property is a function, evaluate it
+  return (typeof obj[key] === 'function' ? obj[key].call(obj) : obj[key]);
 };
 
 // call setter if exists, otherwise set property
@@ -406,10 +405,14 @@ exports.get = function get(name, id, onDone) {
 };
 
 exports.uri = function(name, id) {
-// assume url + id for get by Id
-  var base = meta.result(name, 'url'),
-      uri = base + (base.charAt(base.length - 1) === '/' ? '' : '/') + (id ? encodeURIComponent(id) : '');
-  return uri;
+  // Backbone's url function is annoying in that it always requires an instance of an object
+  // to exist with a specific id. Here, to find out what the url should be,
+  // we'll create a throwaway instance of the object (with the right id)
+  // and then call or fetch the url. This avoids making any assumptions beyond what
+  // Backbone's public API provides; but having to create an object just to figure out the
+  // URL is kind of ugly.
+  var obj = new (meta.model(name))({ id: id });
+  return util.result(obj, 'url'); // call .url() or return .url
 };
 
 // TODO: support traversing a large, fully hydrated object!
@@ -653,7 +656,7 @@ Hydration.prototype.getTasks = function(name, model) {
       id = get(model, idAttr);
 
   // the current model is a task if it has an id
-  if(id && id != null && id !== '') {
+  if(id && id !== null && id !== '') {
     if(!result[name]) {
       result[name] = {};
     }
@@ -905,7 +908,16 @@ Hydration.prototype.flatten = function(name, model) {
 };
 
 Hydration.prototype.hydrate = function(name, model, done) {
-  var self = this;
+  var self = this,
+      total = 0,
+      results = [];
+  function checkDone(result, index) {
+    total++;
+    results[index] = result;
+    if(total == model.length) {
+      done(null, results);
+    }
+  }
   // if the input is an array, then run hydrate on each item and
   // return back the result
   if(Array.isArray(model)) {
@@ -913,15 +925,6 @@ Hydration.prototype.hydrate = function(name, model, done) {
     if(model.length === 0) {
       log.debug('hydrate(): data empty', model);
       return done(null, model);
-    }
-    var total = 0,
-        results = [];
-    function checkDone(result, index) {
-      total++;
-      results[index] = result;
-      if(total == model.length) {
-        done(null, results);
-      }
     }
     model.forEach(function(item, index) {
       var h = new Hydration();
