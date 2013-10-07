@@ -13,13 +13,32 @@ exports['test cache'] = {
     mg.define('test', Backbone.Model.extend({
       sync: mg.sync('test'),
       type: 'test',
-      url: 'http://localhost:7000/test/'
+      urlRoot: 'http://localhost:7000/test/'
     }));
   },
 
   after: function() {
     var ajax = require('../lib/ajax.js');
     cache._setAjax(ajax);
+  },
+
+  'can get the url': function() {
+    // example 1: when urlRoot is set
+    mg.define('url1', Backbone.Model.extend({
+      sync: mg.sync('url1'),
+      type: 'url1',
+      urlRoot: 'http://localhost:7000/url1/'
+    }));
+    assert.equal(cache.uri('url1', 1000), 'http://localhost:7000/url1/1000');
+    // example 2: when url is a function
+    mg.define('url2', Backbone.Model.extend({
+      sync: mg.sync('url2'),
+      type: 'url2',
+      url: function() {
+        return 'http://localhost:7000/url2/' + encodeURIComponent(this.id) + '?exclude=foo';
+      }
+    }));
+    assert.equal(cache.uri('url2', 2000), 'http://localhost:7000/url2/2000?exclude=foo');
   },
 
   'can initialize the cache from a json blob and get() an initialized value': function(done) {

@@ -54,13 +54,32 @@ Given the following JSON data, a one-to-many relation is detected:
       author: [ 200, 300 ]
     }, function(err, model) { ... });
 
-This would be hydrated with `.get('author')` set to a `Backbone.Collection` instance containing the Person models with `id=200` and `id=300`.
+Alternatively, the content of the array can be objects with an id attribute (controlled via Backbone's `.idAttribute`):
+
+    mg.hydrate('Post', {
+      id: 1,
+      author: [ { id: 200 }, { id: 300 } ]
+    }, function(err, model) { ... });
+
+Both of these would be hydrated with `.get('author')` set to a `Backbone.Collection` instance containing the Person models with `id=200` and `id=300`.
 
 ## Fetching models: the find API
 
-Often you don't have the
+The find API makes backend calls to find model ids, and returns fully hydrated models.
 
-The find API makes backend calls to find model ids, and returns fully hydrated models. `model.url` is used to fetch models (you can set this as documented in the Backbone docs).
+The URL is determined using `model.url`, following the Backbone conventions. Here are some examples, see the BB docs as well. Using urlRoot:
+
+    var Post = mg.define('Post', Backbone.Model.extend({
+      urlRoot: '/posts/'
+    }));
+
+Or using a function:
+
+    var Post = mg.define('Post', Backbone.Model.extend({
+      url: function() {
+        return '/posts/' + encodeURIComponent(this.id) + '?exclude=foo';
+      }
+    }));
 
 Models are cached in-memory. This means that you should always use `.findById()`, since it will retrive the model from cache if possible.
 

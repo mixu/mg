@@ -102,7 +102,9 @@ exports.stream = function(name, conditions, onLoaded) {
       instance.add(results);
     }
 
-    onLoaded && onLoaded(null, instance);
+    if(typeof onLoaded === 'function') {
+      onLoaded(null, instance);
+    }
 
     Stream.on(name, 'destroy', function(model) {
         log.info('mg.stream remove collection', instance.id, model.id);
