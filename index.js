@@ -32,7 +32,7 @@ function listLocal(name, onDone) {
 }
 
 function listRemote(name, onDone) {
-  var uri = cache.uri(name);
+  var uri = cache.collectionUri(name);
   log.info('listRemote', name, uri);
   if(!uri) {
     console.error('Unknown mg.stream URL: ' +name);

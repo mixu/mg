@@ -38,7 +38,7 @@ function listLocal(name, onDone) {
 }
 
 function listRemote(name, onDone) {
-  var uri = cache.uri(name);
+  var uri = cache.collectionUri(name);
   log.info('listRemote', name, uri);
   if(!uri) {
     console.error('Unknown mg.stream URL: ' +name);
@@ -415,7 +415,12 @@ exports.uri = function(name, id) {
   return util.result(obj, 'url'); // call .url() or return .url
 };
 
-// TODO: support traversing a large, fully hydrated object!
+exports.collectionUri = function(name) {
+  // get the collection (e.g. defined as { collection: 'Posts' } in each model class)
+  var collection = new (meta.collection(name))();
+  return util.result(collection, 'url'); // call .url() or return .url
+};
+
 exports.store = function(name, values) {
   if(!cache[name]) { cache[name] = {}; }
 
