@@ -11,13 +11,13 @@ require('minilog').enable();
 
 // Model definitions
 var SimpleModel = Backbone.Model.extend({
-  url: 'http://test/SimpleModel',
+  urlRoot: 'http://test/SimpleModel',
   sync: mg.sync('SimpleModel')
 });
 mg.define('SimpleModel', SimpleModel);
 
 var ModelWithChild = Backbone.Model.extend({
-  url: 'http://test/ModelWithChild',
+  urlRoot: 'http://test/ModelWithChild',
   sync: mg.sync('ModelWithChild'),
   rels: {
     child: { type: 'SimpleModel' }
@@ -26,7 +26,7 @@ var ModelWithChild = Backbone.Model.extend({
 mg.define('ModelWithChild', ModelWithChild);
 
 var ModelWithGrandChild = Backbone.Model.extend({
-  url: 'http://test/ModelWithGrandChild',
+  urlRoot: 'http://test/ModelWithGrandChild',
   sync: mg.sync('ModelWithGrandChild'),
   rels: {
     child: { type: 'ModelWithChild' }
@@ -316,7 +316,7 @@ exports['hydrate associations...'] = {
 
     'a model with a circular association': function(done) {
       var FFF = Backbone.Model.extend({
-        url: 'http://test/FFF/',
+        urlRoot: 'http://test/FFF/',
         sync: mg.sync('FFF'),
         rels: {
           child: { type: 'GGG' }
@@ -324,7 +324,7 @@ exports['hydrate associations...'] = {
       });
       mg.define('FFF', FFF);
       var GGG = Backbone.Model.extend({
-        url: 'http://test/GGG',
+        urlRoot: 'http://test/GGG',
         sync: mg.sync('GGG'),
         rels: {
           parent: { type: 'FFF' }

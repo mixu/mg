@@ -152,6 +152,10 @@ CollectionServer.prototype.addRest = function(collection) {
 
   // add DELETE
   this.app.delete(new RegExp('^/'+collection+'/(.+)$'), function(req, res, match) {
+    var parsed = url.parse(req.url, true),
+        parts = parsed.pathname.split('/').filter(function(item) {
+          return item.length > 0;
+        });
     var id =  parts[1];
     self.cache[collection].filter(function(model) {
       if(model.id == id) {

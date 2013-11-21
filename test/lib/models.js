@@ -4,7 +4,7 @@ var Backbone = require('backbone'),
 var Post = Backbone.Model.extend({
   sync: mg.sync('Post'),
   type: 'Post',
-  url: 'http://localhost:8721/posts',
+  urlRoot: 'http://localhost:8721/posts',
   plural: 'posts',
   collection: 'Posts',
   idAttribute: '__id',
@@ -21,6 +21,7 @@ var Post = Backbone.Model.extend({
 mg.define('Post', Post);
 
 var Posts = Backbone.Collection.extend({
+  url: 'http://localhost:8721/posts',
   // additional property
   special: true
 });
@@ -29,7 +30,7 @@ mg.define('Posts', Posts);
 
 var Person = Backbone.Model.extend({
   sync: mg.sync('Person'),
-  url: 'http://localhost:8721/people',
+  urlRoot: 'http://localhost:8721/people',
   plural: 'people'
 });
 
@@ -37,7 +38,7 @@ mg.define('Person', Person);
 
 var Comment = Backbone.Model.extend({
   sync: mg.sync('Comment'),
-  url: 'http://localhost:8721/comments',
+  urlRoot: 'http://localhost:8721/comments',
   plural: 'comments'
 });
 
