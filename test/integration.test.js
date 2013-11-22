@@ -110,37 +110,17 @@ exports['given a simple model'] = {
         done();
       });
     },
-    'if the model definition contains a .parse() function, it is called as part of the hydration': function(done) {
-      var calls = 0;
-      mg.define('ParseHydration', Backbone.Model.extend({
-        urlRoot: 'http://localhost:8721/parsehydration/',
-        sync: mg.sync('ParseHydration'),
-        parse: function(responseJSON, options) {
-          calls++;
-          responseJSON.foo = 'bar';
-          return responseJSON;
-        }
-      }));
-      mg.findById('ParseHydration', 1, function(err, model) {
-        assert.equal(model.get('id'), 1);
-        assert.equal(model.get('name'), 'AA');
-        assert.equal(calls, 1);
-        assert.equal(model.get('foo'), 'bar');
+
+    'findById(..., [ id1, id2 ], should work': function(done) {
+      mg.findById('Post', [1, 2], function(err, val) {
+        assert.ok(Array.isArray(val));
+        assert.equal(val[0].get('__id'), 1);
+        assert.ok(val[0] instanceof Post);
+        assert.equal(val[1].get('__id'), 2);
+        assert.ok(val[1] instanceof Post);
         done();
       });
-    }
-
-  },
-
-  'findById(..., [ id1, id2 ], should work': function(done) {
-    mg.findById('Post', [1, 2], function(err, val) {
-      assert.ok(Array.isArray(val));
-      assert.equal(val[0].get('__id'), 1);
-      assert.ok(val[0] instanceof Post);
-      assert.equal(val[1].get('__id'), 2);
-      assert.ok(val[1] instanceof Post);
-      done();
-    });
+    },
   },
 
   'streaming a collection twice': {
@@ -167,6 +147,39 @@ exports['given a simple model'] = {
           assert.ok(beforeSecondCall === collection.get(2).get('comments'));
           done();
         });
+      });
+    }
+
+  },
+
+  'if the model defines a .parse function, it is called': {
+
+    before: function() {
+      var self = this;
+      self.parseCalls = 0;
+      mg.define('ParseHydration', Backbone.Model.extend({
+        urlRoot: 'http://localhost:8721/parsehydration/',
+        sync: mg.sync('ParseHydration'),
+        parse: function(responseJSON, options) {
+          self.parseCalls++;
+          responseJSON.foo = 'bar';
+          return responseJSON;
+        }
+      }));
+    },
+
+    beforeEach: function() {
+      this.parseCalls = 0;
+    },
+
+    'call .parse post-"read"': function(done) {
+      var self = this;
+      mg.findById('ParseHydration', 1, function(err, model) {
+        assert.equal(model.get('id'), 1);
+        assert.equal(model.get('name'), 'AA');
+        assert.equal(self.parseCalls, 1);
+        assert.equal(model.get('foo'), 'bar');
+        done();
       });
     }
 
