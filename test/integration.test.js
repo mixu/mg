@@ -9,7 +9,7 @@ var assert = require('assert'),
     cache = require('../lib/cache.js');
 
 //require('minilog').suggest.deny(/mg/, 'info');
-require('minilog').enable();
+// require('minilog').enable();
 
 exports['given a simple model'] = {
 
@@ -85,7 +85,51 @@ exports['given a simple model'] = {
         assert.equal(collection.length, 0);
         done();
       });
+    },
+
+    'after hydrating a circular JSON structure, can call toJSON safely': function(done) {
+      mg.define('Circular', Backbone.Model.extend({
+        urlRoot: 'http://localhost:8721/circular/',
+        sync: mg.sync('Circular'),
+        rels: {
+          other: {
+            type: 'Circular'
+          }
+        },
+        toJSON: mg.toJSON('Circular')
+      }));
+
+      mg.findById('Circular', 1, function(err, model) {
+        var result = JSON.parse(JSON.stringify(model));
+        // note how the use of toJSON has stripped the circular dependency out completely
+        assert.deepEqual(result, {
+          id: 1,
+          name: 'A'
+        });
+
+        done();
+      });
+    },
+    'if the model definition contains a .parse() function, it is called as part of the hydration': function(done) {
+      var calls = 0;
+      mg.define('ParseHydration', Backbone.Model.extend({
+        urlRoot: 'http://localhost:8721/parsehydration/',
+        sync: mg.sync('ParseHydration'),
+        parse: function(responseJSON, options) {
+          calls++;
+          responseJSON.foo = 'bar';
+          return responseJSON;
+        }
+      }));
+      mg.findById('ParseHydration', 1, function(err, model) {
+        assert.equal(model.get('id'), 1);
+        assert.equal(model.get('name'), 'AA');
+        assert.equal(calls, 1);
+        assert.equal(model.get('foo'), 'bar');
+        done();
+      });
     }
+
   },
 
   'findById(..., [ id1, id2 ], should work': function(done) {
@@ -155,7 +199,7 @@ exports['given a simple model'] = {
       var instance = new ResponseTest();
       instance.save({ name: 'foo' }, {
         success: function() {
-          console.log(instance);
+          // console.log(instance);
           assert.ok(instance instanceof ResponseTest);
           assert.equal(instance.get('name'), 'foo');
           assert.equal(instance.get('id'), 1);
@@ -193,7 +237,9 @@ exports['given a simple model'] = {
 
 // if this module is the script being run, then run the tests:
 if (module == require.main) {
-  var mocha = require('child_process').spawn('mocha', [ '--colors', '--ui', 'exports', '--reporter', 'spec', __filename ]);
+  var mocha = require('child_process').spawn('mocha',
+    [ '--colors', '--bail', '--ui', 'exports', '--reporter', 'spec', __filename ]
+  );
   mocha.stderr.on('data', function (data) {
     if (/^execvp\(\)/.test(data)) {
      console.log('Failed to start child process. You need mocha: `npm install -g mocha`');

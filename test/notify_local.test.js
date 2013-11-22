@@ -8,7 +8,7 @@ var assert = require('assert'),
 
 // require('./lib/dataset.js')(mg);
 
-require('minilog').enable();
+// require('minilog').enable();
 
 exports['given two subscriptions to a model by id'] = {
 

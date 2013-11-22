@@ -31,6 +31,24 @@ server.add({
       id: 1234,
       name: 'C-1234'
     }
+  ],
+  circular: [
+    {
+      id: 1,
+      name: 'A',
+      other: 2
+    },
+    {
+      id: 2,
+      name: 'B',
+      other: 1
+    }
+  ],
+  parsehydration: [
+    {
+      id: 1,
+      name: 'AA'
+    }
   ]
 });
 

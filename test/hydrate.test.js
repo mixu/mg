@@ -7,7 +7,7 @@ var assert = require('assert'),
     ajax = require('../lib/ajax.js'),
     fakeAjax = require('./lib/fake-ajax.js');
 
-require('minilog').enable();
+// require('minilog').enable();
 
 // Model definitions
 var SimpleModel = Backbone.Model.extend({

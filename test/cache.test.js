@@ -5,7 +5,7 @@ var assert = require('assert'),
     cache = require('../lib/cache.js'),
     Backbone = require('backbone');
 
-require('minilog').enable();
+// require('minilog').enable();
 
 exports['test cache'] = {
 

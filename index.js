@@ -202,3 +202,22 @@ exports.sync = function(name) {
     return Backbone.sync.apply(this, arguments);
   };
 };
+
+// excludes the relationships from the JSON output
+exports.toJSON = function(name) {
+  return function() {
+    var rels = meta.get(name, 'rels'),
+        result = {},
+        self = this;
+    if(rels) {
+      rels = Object.keys(rels);
+      Object.keys(this.attributes).forEach(function(key) {
+        if (rels.indexOf(key) === -1) {
+          result[key] = self.get(key);
+        }
+      });
+      return result;
+    }
+    return this.attributes;
+  };
+};
