@@ -142,6 +142,7 @@ CollectionServer.prototype.addRest = function(collection) {
           case 'test':
           case 'move':
           case 'copy':
+            break;
           default:
         }
       });

@@ -1,4 +1,6 @@
-  'can convert a new plain model to a JSON POST': function() {
+
+exports = {
+ 'can convert a new plain model to a JSON POST': function() {
     // Backbone sync call convention:
     // .sync('create', model, { success: cb, error: cb })
     // .sync('update', model, { success: cb, error: cb })
@@ -77,4 +79,5 @@
       { "remove": "links/comments/5" }
     ]
     */
-  },
+  }
+};

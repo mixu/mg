@@ -208,6 +208,25 @@ exports.sync = function(name) {
     return Backbone.sync.apply(this, arguments);
   };
 };
+
+// excludes the relationships from the JSON output
+exports.toJSON = function(name) {
+  return function() {
+    var rels = meta.get(name, 'rels'),
+        result = {},
+        self = this;
+    if(rels) {
+      rels = Object.keys(rels);
+      Object.keys(this.attributes).forEach(function(key) {
+        if (rels.indexOf(key) === -1) {
+          result[key] = self.get(key);
+        }
+      });
+      return result;
+    }
+    return this.attributes;
+  };
+};
 },
 "lib/ajax.js": function(module, exports, require){
 if(typeof window == 'undefined') {
@@ -352,7 +371,8 @@ var Stream = require('./stream.js'),
     ajax = require('./ajax.js'),
     meta = require('./meta.js'),
     util = require('./util.js'),
-    log = require('minilog')('mg/cache');
+    log = require('minilog')('mg/cache'),
+    Collection = require('backbone').Collection;
 
 var cache = {},
     callbacks = {};
@@ -411,14 +431,23 @@ exports.uri = function(name, id) {
   // and then call or fetch the url. This avoids making any assumptions beyond what
   // Backbone's public API provides; but having to create an object just to figure out the
   // URL is kind of ugly.
-  var obj = new (meta.model(name))({ id: id });
+  var obj, attr = {};
+  // for nonstandard id
+  attr[(meta.get(name, 'idAttribute') || 'id')] = id;
+  obj = new (meta.model(name))(attr);
   return util.result(obj, 'url'); // call .url() or return .url
 };
 
 exports.collectionUri = function(name) {
   // get the collection (e.g. defined as { collection: 'Posts' } in each model class)
-  var collection = new (meta.collection(name))();
-  return util.result(collection, 'url'); // call .url() or return .url
+  var collectionClass = meta.collection(name),
+      collection;
+  if(collectionClass !== Collection) {
+    collection = new collectionClass();
+    return util.result(collection, 'url'); // call .url() or return .url
+  } else {
+    return exports.uri(name);
+  }
 };
 
 exports.store = function(name, values) {
@@ -708,6 +737,10 @@ Hydration.prototype.add = function(name, id) {
 
 function override(name, old, newer) {
   var rels = meta.get(name, 'rels');
+  if(!newer) {
+    return;
+  }
+
   util.keys(newer).forEach(function(key) {
     var idAttr, oldVal, newVal, relType, isCollection;
     oldVal = util.get(old, key);
@@ -762,6 +795,11 @@ Hydration.prototype.next = function(done) {
     }
     if(!self.cache[name]) {
       self.cache[name] = {};
+    }
+    // call model.parse as part of the initialization
+    var model = meta.model(name);
+    if(model && model.prototype && typeof model.prototype.parse === 'function') {
+      result = model.prototype.parse(result);
     }
     // store into intermediate cache
     self.cache[name][id] = result;
