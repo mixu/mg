@@ -1,4 +1,4 @@
-(function(){function require(e,t,n){t||(t=0);var r=require.resolve(e,t),i=require.m[t][r];if(!i)throw new Error('failed to require "'+e+'" from '+n);if(i.c){t=i.c,r=i.m,i=require.m[t][i.m];if(!i)throw new Error('failed to require "'+r+'" from '+t)}return i.exports||(i.exports={},i.call(i.exports,i,i.exports,require.relative(r,t))),i.exports}require.resolve=function(e,t){var n=e,r=e+".js",i=e+"/index.js";return require.m[t][r]&&r||require.m[t][i]&&i||n},require.relative=function(e,t){return function(n){if("."!=n.charAt(0))return require(n,t,e);var r=e.split("/"),i=n.split("/");r.pop();for(var s=0;s<i.length;s++){var o=i[s];".."==o?r.pop():"."!=o&&r.push(o)}return require(r.join("/"),t,e)}};
+(function(){function require(e,t,n){t||(t=0);var r=require.resolve(e,t),i=require.m[t][r];if(!i)throw new Error('failed to require "'+e+'" from '+n);if(i.c){t=i.c,r=i.m,i=require.m[t][i.m];if(!i)throw new Error('failed to require "'+r+'" from '+t)}return i.exports||(i.exports={},i.call(i.exports,i,i.exports,require.relative(r,t))),i.exports}require.resolve=function(e,t){var n=e,r=e+".js",i=e+"/index.js";return require.m[t][r]&&r?r:require.m[t][i]&&i?i:n},require.relative=function(e,t){return function(n){if("."!=n.charAt(0))return require(n,t,e);var r=e.split("/"),i=n.split("/");r.pop();for(var s=0;s<i.length;s++){var o=i[s];".."==o?r.pop():"."!=o&&r.push(o)}return require(r.join("/"),t,e)}};
 require.m = [];
 require.m[0] = {
 "backbone": { exports: window.Backbone },
@@ -418,8 +418,9 @@ exports.get = function get(name, id, onDone) {
     return onDone(undefined, item);
   }
   // do remote fetch if not locally available
-  if(!meta.get(name, 'url')) throw new Error(name + ' does not have a definition.');
-
+  if(!meta.get(name, 'url')) {
+    throw new Error(name + ' does not have a definition.');
+  }
   var uri = exports.uri(name, id);
   exports.fetch(name, uri, onDone);
 };
@@ -434,7 +435,11 @@ exports.uri = function(name, id) {
   var obj, attr = {};
   // for nonstandard id
   attr[(meta.get(name, 'idAttribute') || 'id')] = id;
-  obj = new (meta.model(name))(attr);
+  // if possible, avoid instantiation
+  obj = exports.local(name, id);
+  if (!obj) {
+    obj = new (meta.model(name))(attr);
+  }
   return util.result(obj, 'url'); // call .url() or return .url
 };
 
@@ -474,7 +479,6 @@ exports.store = function(name, values) {
             util.set(cache[name][id], key, updated);
           }
         });
-        return;
       } else {
         log.debug('Caching first time', name, id);
         cache[name][id] = value;
@@ -758,7 +762,10 @@ function override(name, old, newer) {
       }
     }
     // override the value
-    util.set(old, key, util.get(newer, key));
+    if(oldVal !== newVal) {
+      log.info('overwrite from cache', old, key, oldVal, newVal);
+      util.set(old, key, newVal);
+    }
   });
 }
 
@@ -771,7 +778,9 @@ Hydration.prototype.next = function(done) {
   var name = task.name,
       id = task.id;
 
-  cache.get(name, id, function(err, result) {
+  cache.get(name, id, function(err, globalCacheLast) {
+    // assuming that returns valid results from the local cache or remote server
+    var result = globalCacheLast;
     if(err) {
       if(err == 404) {
         log.warn('Skip hydration for:', name, id, 'due to 404.');
@@ -782,15 +791,21 @@ Hydration.prototype.next = function(done) {
     // merge with inputcache (e.g. so that input ids will be hydrated)
     if(self.inputCache[name] && self.inputCache[name][id]) {
       var modelClass = meta.model(name);
-      log.info('Override values for:', name, id);
-      if (self.inputCache[name][id] instanceof modelClass) {
-        // if the model in the input cache is an instance, we must reuse it
-        override(name, self.inputCache[name][id], result);
-        // to avoid creating duplicates when the model instance already exists
+      // always use the (global) cache result model as the return value
+      // but apply the more recent updates from the ongoing hydration to it
+      if (globalCacheLast) {
+        override(name, globalCacheLast, self.inputCache[name][id]);
+        result = globalCacheLast;
+
+        if (self.inputCache[name][id] instanceof modelClass &&
+            self.inputCache[name][id] !== globalCacheLast) {
+          // disagreement: a second model instance has been created somewhere else,
+          // update that other with the same values as in the result
+          override(name, self.inputCache[name][id], globalCacheLast);
+        }
+      } else if (globalCacheLast instanceof modelClass === false){
+        // only if the result from GET or from the cache is empty
         result = self.inputCache[name][id];
-      } else {
-        // default to using the cache result model as the basis
-        override(name, result, self.inputCache[name][id]);
       }
     }
     if(!self.cache[name]) {
@@ -1011,7 +1026,8 @@ Hydration.prototype.hydrate = function(name, model, done) {
   }
 };
 },
-"microee": {"c":1,"m":"index.js"}};
+"microee": {"c":1,"m":"index.js"},
+};
 require.m[1] = {
 "backbone": { exports: window.Backbone },
 "minilog": { exports: window.Minilog },
@@ -1098,6 +1114,7 @@ module.exports = {
   },
   "_id": "microee@0.0.2",
   "_from": "microee@0.0.2"
-};}};
+};}
+};
 mg = require('index.js');
 }());
