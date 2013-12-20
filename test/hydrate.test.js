@@ -81,7 +81,12 @@ exports['hydrate associations...'] = {
     var self = this;
     this.ajaxCalls = [];
     cache._setAjax(fakeAjax({
-      posts: [ { __id: 1, name: 'Posts1' }, { __id: 555, name: 'Posts1' }, ],
+      posts: [
+          { __id: 1, name: 'Posts1' },
+          { __id: 555, name: 'Posts1' },
+          { __id: 223344, name: 'AncientPostFromServer' },
+          { __id: 1122 },
+      ],
       people: [ { id: 1000, name: 'Bar' } ],
       SimpleModel: [ 1, 2, 3 ].map(function(i) {
         return { id: i, name: 'Simple'+i };
@@ -232,7 +237,7 @@ exports['hydrate associations...'] = {
           name: 'Foo',
           author: 1000
         }, function(err, val) {
-        // console.log(val);
+        console.log(val);
         assert.ok(val instanceof Model.Post);
         // check that the model id is correct
         assert.equal(val.get('__id'), 1);
@@ -367,24 +372,64 @@ exports['hydrate associations...'] = {
 
     'if the model to be hydrated exists in cache, then update and reuse the cached model': function(done) {
       var self = this;
-      this.ajaxCalls = [];
+
+      mg.hydrate('Post', { __id: 223344, name: 'Ancient post' },
+        function(err, postInstance) {
+
+        self.ajaxCalls = [];
+
+        assert.ok(cache.local('Post', 223344));
+
+        mg.hydrate('Post', {
+            __id: 223344,
+            name: 'New post',
+            author: 1000
+          }, function(err, val) {
+          // assert that no ajax calls were made
+          assert.equal(self.ajaxCalls.length, 0);
+
+          // assert that the instance was reused
+          assert.strictEqual(val, postInstance);
+
+          // with updated value
+          assert.equal(val.get('name'), 'New post');
+          // and the rest of the data is like before
+          assert.equal(val.get('__id'), 223344);
+          assert.equal(val.get('author').get('name'), 'Bar');
+
+          done();
+        });
+      });
+    },
+
+    // Cache precedence:
+    // 1) top priority: any values passed directly to Hydrate
+    // 2) second priority: any values from the server
+    // 3) any values in the cache from a previous hydrate
+    'cache precedence': function(done) {
+      // start by writing a value into the cache
       mg.hydrate('Post', {
-          __id: 1,
-          name: 'New post',
-          author: 1000
-        }, function(err, val) {
-        // assert that no ajax calls were made
-        assert.equal(self.ajaxCalls.length, 0);
+        __id: 1122,
+        value1: 'second',
+        value2: 'second'
+      }, function(err, first) {
 
-        // assert that the instance was reused
-        assert.strictEqual(val, self.postInstance);
-        // with updated value
-        assert.equal(val.get('name'), 'New post');
-        // and the rest of the data is like before
-        assert.equal(val.get('__id'), 1);
-        assert.equal(val.get('author').get('name'), 'Bar');
+        // instantiate another model by force because
+        // the issue arises when the input cache and the global cache disagree
+        // on what the canonical model instance is
+        var model = new Model.Post({ __id: 1122, value1: 'last' });
+        mg.hydrate('Post', model, function(err, instance) {
+          // when a disagreement occurs, the global model should always win
+          assert.strictEqual(instance, first);
+          // the input from the disagreeing model should be taken into account
+          assert.equal(instance.get('value1'), 'last');
+          assert.equal(instance.get('value2'), 'second');
+          // when a disagreement occurs, the disagreeing model should also be updated
+          assert.equal(model.get('value1'), 'last');
+          assert.equal(model.get('value2'), 'second');
 
-        done();
+          done();
+        });
       });
     },
 
@@ -427,9 +472,18 @@ exports['hydrate associations...'] = {
       assert.ok(instance instanceof Model.Post);
       mg.hydrate('Post', instance, function(err, val) {
         assert.ok(val instanceof Model.Post);
-        assert.strictEqual(instance, val);
+
+        // Change in behavior: always reuse the model from the global cache,
+        // even if some external operation has created a duplicate
+        assert.notStrictEqual(instance, val);
+
+        // Both the returned global instance and the
+        // duplicate instance should have the most recent (hydrated)
+        // information
         assert.equal(val.get('Foo'), 'bar');
         assert.equal(val.get('author').get('name'), 'Bar');
+        assert.equal(instance.get('Foo'), 'bar');
+//        assert.equal(instance.get('author').get('name'), 'Bar');
         done();
       });
     }
