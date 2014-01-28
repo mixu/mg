@@ -1,8 +1,9 @@
-(function(){function require(e,t,n){t||(t=0);var r=require.resolve(e,t),i=require.m[t][r];if(!i)throw new Error('failed to require "'+e+'" from '+n);if(i.c){t=i.c,r=i.m,i=require.m[t][i.m];if(!i)throw new Error('failed to require "'+r+'" from '+t)}return i.exports||(i.exports={},i.call(i.exports,i,i.exports,require.relative(r,t))),i.exports}require.resolve=function(e,t){var n=e,r=e+".js",i=e+"/index.js";return require.m[t][r]&&r?r:require.m[t][i]&&i?i:n},require.relative=function(e,t){return function(n){if("."!=n.charAt(0))return require(n,t,e);var r=e.split("/"),i=n.split("/");r.pop();for(var s=0;s<i.length;s++){var o=i[s];".."==o?r.pop():"."!=o&&r.push(o)}return require(r.join("/"),t,e)}};
-require.m = [];
-require.m[0] = {
+(function(){
+var r=function(){var e="function"==typeof require&&require,r=function(i,o,u){o||(o=0);var n=r.resolve(i,o),t=r.m[o][n];if(!t&&e){if(t=e(n))return t}else if(t&&t.c&&(o=t.c,n=t.m,t=r.m[o][t.m],!t))throw new Error('failed to require "'+n+'" from '+o);if(!t)throw new Error('failed to require "'+i+'" from '+u);return t.exports||(t.exports={},t.call(t.exports,t,t.exports,r.relative(n,o))),t.exports};return r.resolve=function(e,n){var i=e,t=e+".js",o=e+"/index.js";return r.m[n][t]&&t?t:r.m[n][o]&&o?o:i},r.relative=function(e,t){return function(n){if("."!=n.charAt(0))return r(n,t,e);var o=e.split("/"),f=n.split("/");o.pop();for(var i=0;i<f.length;i++){var u=f[i];".."==u?o.pop():"."!=u&&o.push(u)}return r(o.join("/"),t,e)}},r}();r.m = [];
+r.m[0] = {
 "backbone": { exports: window.Backbone },
 "minilog": { exports: window.Minilog },
+"microee": {"c":1,"m":"index.js"},
 "index.js": function(module, exports, require){
 var cache = require('./lib/cache.js'),
     meta = require('./lib/meta.js'),
@@ -255,6 +256,9 @@ function fetch(uri, callback) {
 function ajaxFetch(uri, callback) {
   $.ajax(uri, {
       dataType: 'json',
+      // important: cache must be false, as otherwise jQuery can get into
+      // a bad state if a request is aborted, cached and then never cachebusted
+      cache: false,
       success: function(data, status, jqXHR) {
         callback(null, data);
       },
@@ -1025,10 +1029,9 @@ Hydration.prototype.hydrate = function(name, model, done) {
     }
   }
 };
-},
-"microee": {"c":1,"m":"index.js"},
+}
 };
-require.m[1] = {
+r.m[1] = {
 "backbone": { exports: window.Backbone },
 "minilog": { exports: window.Minilog },
 "index.js": function(module, exports, require){
@@ -1113,8 +1116,12 @@ module.exports = {
     "url": "https://github.com/mixu/microee/issues"
   },
   "_id": "microee@0.0.2",
-  "_from": "microee@0.0.2"
-};}
+  "dist": {
+    "shasum": "f3f244c0524a9c8d061cbbf30e0c436cf4608823"
+  },
+  "_from": "microee@0.0.2",
+  "_resolved": "https://registry.npmjs.org/microee/-/microee-0.0.2.tgz"
 };
-mg = require('index.js');
-}());
+}
+};
+mg = r("index.js");}());
