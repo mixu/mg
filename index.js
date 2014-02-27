@@ -92,6 +92,41 @@ exports.stream = function(name, conditions, onLoaded) {
   return instance;
 };
 
+// Model extensions
+
+exports.getter = function(name, oldGetter) {
+  return function(attr) {
+    // if attr is a rel property
+    // check if it's loaded
+    // else throw
+  };
+};
+
+exports.fetchWith = function(name) {
+  return function(rels, onDone) {
+    // ensure that the given rels are loaded
+    // call onDone
+  };
+};
+
+exports.link = function(name) {
+  return function(instances, onDone) {
+    var tasks = (Array.isArray(instances) ? instances : [ instances ]).map(function() {
+      // make ajax call
+    });
+    // call onDone
+  };
+};
+
+exports.unlink = function(name) {
+  return function(instances, onDone) {
+    var tasks = (Array.isArray(instances) ? instances : [ instances ]).map(function() {
+      // make ajax call
+    });
+    // call onDone
+  };
+};
+
 exports.sync = function(name) {
  return function(op, model, opts) {
     log.info('sync', op, name+'='+model.id, model, opts);
