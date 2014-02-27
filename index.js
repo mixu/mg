@@ -17,44 +17,12 @@ if(typeof window == 'undefined') {
   };
 }
 
-// Define a correspondence between a name and a Model class (and metadata)
 exports.define = meta.define;
 exports.hydrate = hydrate;
 exports.meta = meta;
 exports.cache = cache;
 
-// Query API
-
-function listLocal(name, onDone) {
-  onDone(undefined, cache.keys(name).map(function(id) {
-    return cache.local(name, id);
-  }));
-}
-
-function listRemote(name, onDone) {
-  var uri = cache.collectionUri(name);
-  log.info('listRemote', name, uri);
-  if(!uri) {
-    console.error('Unknown mg.stream URL: ' +name);
-  }
-  cache.fetch(name, uri, function(err, data) {
-    // apply hydration to the remote items
-    hydrate(name, data, onDone);
-  });
-}
-
-function listBoth(name, onDone) {
-  listLocal(name, function(err, localItems) {
-    listRemote(name, function(err, remoteItems) {
-      if(remoteItems) {
-        onDone(err, localItems.concat(remoteItems));
-      } else {
-        onDone(err, localItems);
-      }
-    });
-  });
-}
-
+// External API
 // return a collection of models based on a set of conditions
 exports.find = function(name, conditions, onDone) {
   var idAttr = meta.get(name, 'idAttribute') || 'id';
@@ -71,13 +39,10 @@ exports.find = function(name, conditions, onDone) {
     });
   }
   // this is how we say "get all"
-  if(conditions.since === 0) {
-    return listBoth(name, onDone);
+  if(util.keys(conditions).length === 0) {
+    return cache.getAll(name, onDone);
   }
-
-  // search by something else -> needs to be run remotely, since we don't have the ability to
-  // reason about queries on the client side
-
+  // search by something else -> needs to be run remotely
 };
 
 // return a single model  based on a set of conditions
@@ -96,7 +61,7 @@ exports.findById = function(name, id, onDone) {
 exports.stream = function(name, conditions, onLoaded) {
   var instance = new (meta.collection(name))();
   // start the find
-  exports.find(name, { since: 0 }, function(err, results) {
+  exports.find(name, { }, function(err, results) {
     // add the results to the collection
     if(results) {
       instance.add(results);

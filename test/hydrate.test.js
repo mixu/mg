@@ -107,7 +107,7 @@ exports['hydrate associations...'] = {
   },
 
   beforeEach: function() {
-    this.h = new mg.hydrate.hydrate2();
+    this.h = new mg.hydrate.hydrate();
   },
 
   'deps': {

@@ -3,6 +3,7 @@ var assert = require('assert'),
     mg = require('mg'),
     Model = require('./lib/models.js'),
     cache = require('../lib/cache.js'),
+    meta = require('../lib/meta.js'),
     Backbone = require('backbone');
 
 // require('minilog').enable();
@@ -29,7 +30,7 @@ exports['test cache'] = {
       type: 'url1',
       urlRoot: 'http://localhost:7000/url1/'
     }));
-    assert.equal(cache.uri('url1', 1000), 'http://localhost:7000/url1/1000');
+    assert.equal(meta.uri('url1', 1000), 'http://localhost:7000/url1/1000');
     // example 2: when url is a function
     mg.define('url2', Backbone.Model.extend({
       sync: mg.sync('url2'),
@@ -38,7 +39,7 @@ exports['test cache'] = {
         return 'http://localhost:7000/url2/' + encodeURIComponent(this.id) + '?exclude=foo';
       }
     }));
-    assert.equal(cache.uri('url2', 2000), 'http://localhost:7000/url2/2000?exclude=foo');
+    assert.equal(meta.uri('url2', 2000), 'http://localhost:7000/url2/2000?exclude=foo');
   },
 
   'can initialize the cache from a json blob and get() an initialized value': function(done) {
