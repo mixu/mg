@@ -80,7 +80,7 @@ exports['hydrate associations...'] = {
   before: function() {
     var self = this;
     this.ajaxCalls = [];
-    cache._setAjax(fakeAjax({
+    ajax._setAjax(fakeAjax({
       posts: [
           { __id: 1, name: 'Posts1' },
           { __id: 555, name: 'Posts1' },
@@ -103,7 +103,7 @@ exports['hydrate associations...'] = {
   },
 
   after: function() {
-    cache._setAjax(ajax);
+    ajax._setAjax(require('../lib/ajax.js')._nodeFetch);
   },
 
   beforeEach: function() {

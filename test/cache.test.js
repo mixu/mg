@@ -3,6 +3,7 @@ var assert = require('assert'),
     mg = require('mg'),
     Model = require('./lib/models.js'),
     cache = require('../lib/cache.js'),
+    ajax = require('../lib/ajax.js'),
     meta = require('../lib/meta.js'),
     Backbone = require('backbone');
 
@@ -19,8 +20,7 @@ exports['test cache'] = {
   },
 
   after: function() {
-    var ajax = require('../lib/ajax.js');
-    cache._setAjax(ajax);
+    ajax._setAjax(require('../lib/ajax.js')._nodeFetch);
   },
 
   'can get the url': function() {
@@ -68,7 +68,7 @@ exports['test cache'] = {
   },
 
   'fetching a model thats not available causes a external fetch': function(done) {
-    cache._setAjax(function(uri, onDone) {
+    ajax._setAjax(function(uri, onDone) {
       assert.equal('http://localhost:7000/test/9000', uri);
       onDone(null, { id: 7000});
       done();
@@ -79,7 +79,7 @@ exports['test cache'] = {
   'if the external fetch is still pending, do not queue a second external fetch': function(done) {
     var calls = 0,
         resultCalls = 0;
-    cache._setAjax(function(uri, onDone) {
+    ajax._setAjax(function(uri, onDone) {
       calls++;
       if(calls == 1) {
         setTimeout(function() {
