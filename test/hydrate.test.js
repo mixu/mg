@@ -7,7 +7,7 @@ var assert = require('assert'),
     ajax = require('../lib/ajax.js'),
     fakeAjax = require('./lib/fake-ajax.js');
 
-// require('minilog').enable();
+require('minilog').enable();
 
 // Model definitions
 var SimpleModel = Backbone.Model.extend({
@@ -106,107 +106,6 @@ exports['hydrate associations...'] = {
     ajax._setAjax(require('../lib/ajax.js')._nodeFetch);
   },
 
-  beforeEach: function() {
-    this.h = new mg.hydrate.hydrate();
-  },
-
-  'deps': {
-
-    'simple': function() {
-      assert.deepEqual(
-        { SimpleModel: { 1000: true } },
-        this.h.getTasks('SimpleModel', { id: 1000 })
-      );
-    },
-
-    'rel is number or string': function() {
-      assert.deepEqual(
-        { ModelWithChild: { 1000: true }, SimpleModel: { '100': true } },
-        this.h.getTasks('ModelWithChild', { id: 1000, child: 100 })
-      );
-      assert.deepEqual(
-        { ModelWithChild: { 1000: true }, SimpleModel: { 'abcd': true } },
-        this.h.getTasks('ModelWithChild', { id: 1000, child: 'abcd' })
-      );
-    },
-
-    'rel is an array of numbers/strings': function() {
-      assert.deepEqual(
-        { ModelWithChild: { 1000: true }, SimpleModel: { 'qwe': true, '111': true } },
-        this.h.getTasks('ModelWithChild', { id: 1000, child: [ 'qwe', 111 ] })
-      );
-    },
-
-    'rel is undefined, null or empty string': function() {
-      assert.deepEqual(
-        { ModelWithChild: { 1000: true } },
-        this.h.getTasks('ModelWithChild', { id: 1000 })
-      );
-      assert.deepEqual(
-        { ModelWithChild: { 1000: true } },
-        this.h.getTasks('ModelWithChild', { id: 1000, child: undefined })
-      );
-      assert.deepEqual(
-        { ModelWithChild: { 1000: true } },
-        this.h.getTasks('ModelWithChild', { id: 1000, child: null })
-      );
-      assert.deepEqual(
-        { ModelWithChild: { 1000: true } },
-        this.h.getTasks('ModelWithChild', { id: 1000, child: '' })
-      );
-    },
-
-    'base model id is undefined, null or empty string': function() {
-      assert.deepEqual(
-        { },
-        this.h.getTasks('SimpleModel', { })
-      );
-      assert.deepEqual(
-        { },
-        this.h.getTasks('SimpleModel', { id: undefined })
-      );
-      assert.deepEqual(
-        { },
-        this.h.getTasks('SimpleModel', { id: null })
-      );
-      assert.deepEqual(
-        { },
-        this.h.getTasks('SimpleModel', { id: '' })
-      );
-    },
-
-    'rel is a Model instance': function() {
-      assert.deepEqual(
-        { ModelWithChild: { 1000: true }, SimpleModel: { '123': true } },
-        this.h.getTasks('ModelWithChild', { id: 1000, child: new SimpleModel({ id: 123 }) })
-      );
-    },
-
-    'rel is a Collection of Models': function() {
-      assert.deepEqual(
-        { ModelWithChild: { 1000: true }, SimpleModel: { '456': true, '789': true } },
-        this.h.getTasks('ModelWithChild', {
-          id: 1000,
-          child: new Backbone.Collection([
-            new SimpleModel({ id: 456 }),
-            new SimpleModel({ id: '789' })
-            ])
-        })
-      );
-    }
-  },
-
-  'cannot add a duplicate task to the queue': function() {
-    assert.ok(this.h.add('test', 1));
-    assert.ok(!this.h.add('test', 1));
-  },
-
-  'can fetch and store an item into the interim cache': function() {
-    assert.ok(this.h.add('SimpleModel', 1));
-    this.h.next(function() {
-    });
-  },
-
   'hydrate': {
 
     'a model with no associations': function(done) {
@@ -217,6 +116,7 @@ exports['hydrate associations...'] = {
       });
     },
 
+/* array syntax deprecated
     'an array of no-assoc models': function(done) {
       mg.hydrate('Comment', [ { text: 'foo' }, { text: 'bar' } ], function(err, results) {
         assert.ok(Array.isArray(results));
@@ -227,6 +127,7 @@ exports['hydrate associations...'] = {
         done();
       });
     },
+*/
 
     // TODO: test where the data is locally available and cache returns a 404
 
