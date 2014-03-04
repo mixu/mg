@@ -5,7 +5,7 @@ var Post = Backbone.Model.extend({
   sync: mg.sync('Post'),
   type: 'Post',
   urlRoot: 'http://localhost:8721/posts',
-  plural: 'posts',
+//  get: mg.getter('Post', Backbone.Model.prototype.get),
   collection: 'Posts',
   idAttribute: '__id',
   rels: {
@@ -30,16 +30,14 @@ mg.define('Posts', Posts);
 
 var Person = Backbone.Model.extend({
   sync: mg.sync('Person'),
-  urlRoot: 'http://localhost:8721/people',
-  plural: 'people'
+  urlRoot: 'http://localhost:8721/people'
 });
 
 mg.define('Person', Person);
 
 var Comment = Backbone.Model.extend({
   sync: mg.sync('Comment'),
-  urlRoot: 'http://localhost:8721/comments',
-  plural: 'comments'
+  urlRoot: 'http://localhost:8721/comments'
 });
 
 mg.define('Comment', Comment);

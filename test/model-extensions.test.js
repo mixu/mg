@@ -23,13 +23,41 @@ exports['given two subscriptions to a model by id'] = {
     this.server.once('close', done).close();
   },
 
+/*
   'calling get without asking for "with" throws': function(done) {
     var self = this;
     mg.findById('Post', 1, function(err, post) {
-
+      assert.throws(function() {
+        post.get('comments');
+      }, Error);
       done();
     });
   }
+*/
+
+  'basic findById': function(done) {
+    var self = this;
+
+    var post = new Post({ id: 1});
+
+    post.fetch({ data: { rels: 'Comment' }}).done(function(data, textStatus, jqXHR) {
+      mg.hydrate('Post', post, data);
+
+    });
+
+
+    mg.findById('Post', 1, function(err, post) {
+      assert.ok(post instanceof Post);
+      done();
+    });
+  },
+
+  'findById with rels': function() {
+    mg.findById('Post', { id: 1, rels: 'comments' }, function(err, post) {
+      assert.ok(post instanceof Post);
+      done();
+    });
+  },
 
 };
 

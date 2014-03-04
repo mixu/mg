@@ -97,8 +97,14 @@ exports.stream = function(name, conditions, onLoaded) {
 exports.getter = function(name, oldGetter) {
   return function(attr) {
     // if attr is a rel property
-    // check if it's loaded
-    // else throw
+    var rels = meta.get(name, 'rels');
+    if(rels && rels[attr]) {
+      // check if it's loaded, if not, throw
+      if(!this._loadedRels || this._loadedRels[attr]) {
+        throw new Error('Rel is not loaded: ' + name + '.' + attr);
+      }
+    }
+    return oldGetter.call(this, attr);
   };
 };
 
