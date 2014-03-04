@@ -2,10 +2,8 @@ var Backbone = require('backbone'),
     mg = require('mg');
 
 var Post = Backbone.Model.extend({
-  sync: mg.sync('Post'),
   type: 'Post',
   urlRoot: 'http://localhost:8721/posts',
-//  get: mg.getter('Post', Backbone.Model.prototype.get),
   collection: 'Posts',
   idAttribute: '__id',
   rels: {
@@ -29,14 +27,12 @@ var Posts = Backbone.Collection.extend({
 mg.define('Posts', Posts);
 
 var Person = Backbone.Model.extend({
-  sync: mg.sync('Person'),
   urlRoot: 'http://localhost:8721/people'
 });
 
 mg.define('Person', Person);
 
 var Comment = Backbone.Model.extend({
-  sync: mg.sync('Comment'),
   urlRoot: 'http://localhost:8721/comments'
 });
 
