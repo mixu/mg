@@ -22,7 +22,8 @@
   "dependencies": {
     "backbone": "~1.0.0",
     "microee": "0.0.6",
-    "najax": "~0.1.05"
+    "najax": "~0.1.05",
+    "miniq": "0.0.1"
   },
   "peerDependencies": {
     "minilog": "~2.x"

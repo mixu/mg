@@ -68,7 +68,7 @@ exports['test cache'] = {
   },
 
   'fetching a model thats not available causes a external fetch': function(done) {
-    ajax._setAjax(function(uri, onDone) {
+    ajax._setAjax(function(uri, method, onDone) {
       assert.equal('http://localhost:7000/test/9000', uri);
       onDone(null, { id: 7000});
       done();
@@ -79,7 +79,7 @@ exports['test cache'] = {
   'if the external fetch is still pending, do not queue a second external fetch': function(done) {
     var calls = 0,
         resultCalls = 0;
-    ajax._setAjax(function(uri, onDone) {
+    ajax._setAjax(function(uri, method, onDone) {
       calls++;
       if(calls == 1) {
         setTimeout(function() {

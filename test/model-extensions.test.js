@@ -8,7 +8,7 @@ var assert = require('assert'),
     Backbone = require('backbone'),
     Collection = Backbone.Collection;
 
-require('minilog').enable();
+// require('minilog').enable();
 
 // since shimming jQuery's promises-based ajax API is not directly supported by jQuery,
 // probably for some good reason, simply fake the fetch requests

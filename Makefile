@@ -1,4 +1,9 @@
-TESTS += test/*.test.js
+TESTS += test/cache.test.js
+# TESTS += test/hydrate.test.js
+# TESTS += test/integration.test.js
+TESTS += test/model-extensions.test.js
+TESTS += test/notify_local.test.js
+TESTS += test/validation.test.js
 
 test:
 	@mocha \
@@ -13,6 +18,8 @@ build:
 		--include ./lib \
 		--include ./index.js \
 		--include ./node_modules/microee \
+		--include ./node_modules/miniq \
+		--exclude package.json \
 		--replace backbone=window.Backbone \
 		--replace minilog=window.Minilog \
 		--global mg \
@@ -24,6 +31,8 @@ build-min:
 		--include ./lib \
 		--include ./index.js \
 		--include ./node_modules/microee \
+		--include ./node_modules/miniq \
+		--exclude package.json \
 		--replace backbone=window.Backbone \
 		--replace minilog=window.Minilog \
 		--command 'uglifyjs --no-copyright' \
@@ -36,6 +45,8 @@ build-debug:
 		--include ./lib \
 		--include ./index.js \
 		--include ./node_modules/microee \
+		--include ./node_modules/miniq \
+		--exclude package.json \
 		--replace backbone=window.Backbone \
 		--replace minilog=window.Minilog \
 		--global mg \

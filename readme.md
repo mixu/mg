@@ -12,21 +12,9 @@
 
 ## Getting started
 
-`mg` uses regular Backbone models, but adds a few additional properties, a model registry and a model cache. To set up `mg` hydration, define additional properties on the model and set the `sync` function. For example:
+### 1. Define model relations
 
-    var Post = Backbone.Model.extend({
-      sync: mg.sync('Post')
-    });
-
-    mg.define('Post', Post);
-
-The `sync` function is added so that `mg` can intercept `model.sync()`, allowing it to detect when new models are created.
-
-The `mg.define()` call registers the model with hydration, so that relations can find the right model class and metadata.
-
-## Defining relations
-
-To define relations, define the type of the related model on `.rels["keyname"]`. For example, to have `Post.author` be hydrated as an instance of `Person`:
+To set up `mg` hydration, define a `rels` property. For example, to have `Post.author` be hydrated as an instance of `Person`:
 
     var Post = Backbone.Model.extend({
       rels: {
@@ -36,13 +24,18 @@ To define relations, define the type of the related model on `.rels["keyname"]`.
 
     mg.define('Post', Post);
 
+The `mg.define()` call registers the model with hydration, so that relations can find the right model class and metadata.
+
 `mg` supports both one-to-one, one-to-many and many-to-one relations. You do not need to explicitly define the type of relation, as it will be inferred from the JSON data.
 
 For example, given the following JSON data, a one-to-one relation is detected:
 
     mg.hydrate('Post', {
       id: 1,
-      author: 1000
+      author: {
+        id: 100,
+        name: 'Foo'
+      }
     }, function(err, model) { ... });
 
 This would be hydrated with `.get('author')` set to the Person with `id=1000`. If that model is not available from the local cache, it is fetched before returning the hydrated model.
@@ -51,45 +44,29 @@ Given the following JSON data, a one-to-many relation is detected:
 
     mg.hydrate('Post', {
       id: 1,
-      author: [ 200, 300 ]
+      author: [ { id: 123, ... }, { ... } ]
     }, function(err, model) { ... });
 
-Alternatively, the content of the array can be objects with an id attribute (controlled via Backbone's `.idAttribute`):
+### 2. Find models and collections
 
-    mg.hydrate('Post', {
-      id: 1,
-      author: [ { id: 200 }, { id: 300 } ]
-    }, function(err, model) { ... });
+`findById(name, id, rels, onDone)`: retrieves a model by id. Reads the model from `model.url` + `/` + `id`.
 
-Both of these would be hydrated with `.get('author')` set to a `Backbone.Collection` instance containing the Person models with `id=200` and `id=300`.
+`stream(name, rels, onDone)`: retrieves a model by id. Reads the model from `model.url` + `/` + `id`.
 
-## Fetching models: the find API
+Alternatively, you can use
 
-The find API makes backend calls to find model ids, and returns fully hydrated models.
+`model.fetch()`
 
-The URL is determined using `model.url`, following the Backbone conventions. Here are some examples, see the BB docs as well. Using urlRoot:
+`collection.fetch()`
 
-    var Post = mg.define('Post', Backbone.Model.extend({
-      urlRoot: '/posts/'
-    }));
-
-Or using a function:
-
-    var Post = mg.define('Post', Backbone.Model.extend({
-      url: function() {
-        return '/posts/' + encodeURIComponent(this.id) + '?exclude=foo';
-      }
-    }));
+The URL is determined using `model.url`, following the Backbone conventions.
 
 Models are cached in-memory. This means that you should always use `.findById()`, since it will retrive the model from cache if possible.
 
-`findById(name, id, onDone)`: retrieves a model by id. Reads the model from `model.url` + `/` + `id`.
+### 3. Link associated models
 
-`findOne(name, conditions, onDone)`: retrieves a single model by any condition. Reads the model from `model.url` + `?` + `condition=value`.
 
-`find(name, conditions, onDone)` / : retrieves a model by a set of conditions.
 
-Alternatively, you can use `model.fetch()` ??
 
 ## Hydration API
 
@@ -127,28 +104,6 @@ By default, collections of Post models are contained inside a Backbone.Collectio
 
     mg.define('Posts', Posts);
 
-## Validation API
-
-    field: {
-      validation: RegExp|function|array of RegExp/function,
-    }
-
-Validation is optional and separate from saving. Built in validators (inspired by [mongoose](http://mongoosejs.com/docs/validation.html)):
-
-- `required: true` is builtin.
-- Numbers have min and max validators
-- Strings have enum and match validators
-
-For example:
-
-    rels: {
-      type: Date
-    }
-
-To validate:
-
-    var err = model.validate();
-
 ## Creating / reading / updating / deleting
 
 How `mg` hooks into CRUD:
@@ -182,23 +137,48 @@ For example, to store a JSON structure in order to preload a model:
 
 If a request is already pending to a particular URL, then the cache will not start a new request. Instead, the
 
-## Remapping
+-----
 
-    module.exports = {
-      // inline define
-      Post: mg.define('Post', Backbone.Model.extend({
-        sync: mg.sync('Post'),
-        plural: 'posts'
-      })),
-      // easier getter
-      posts: function(conditions, onDone) {
-        return mg.find('Post', conditions, onDone);
-      }
-    };
+## High level API
 
+`mg.findById(name, { id: 1, rels: rels }, onDone)`: find a model by id
 
-## Streaming collections
+`model.fetch({ rels: '...', success: function(model, response, options){ }, error: ... })`: ensure that the given rels are loaded, return jqXHR
 
-Streaming collections make it easy to track all instances of a specific type.
+`model.get(rel)`: throws an error if the related model has not been loaded
 
-`stream(name, conditions, onLoaded)`
+`model.link(instances, onDone)`: perform a REST call to link the given instances to the model
+
+`model.unlink(instances, onDone)`: perform a REST call to unlink the given instances from the model
+
+Changes:
+
+- model.get needs to become relationship aware
+- hydration needs to become boundary aware
+- cache prefilling
+- cache invalidation
+- skipping cache
+- .plural is deprecated
+
+## Low level API
+
+`hydrate(name, json, onDone)`
+
+    new Hydration()
+      .filter(function(parent, child) {
+        if(parent.model == origClass && parent.id == origModel &&
+           child.model in rels) {
+            return true;
+        }
+        return false;
+      })
+      .addJson(json)
+      .exec(onDone)
+
+-----
+
+Cacheable: single fetch by id
+Uncacheable: collection fetch (due to sorting etc.)
+
+done(data)
+

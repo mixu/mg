@@ -4,7 +4,8 @@ var cache = require('./lib/cache.js'),
     Backbone = require('backbone'),
     ajax = require('./lib/ajax.js'),
     log = require('minilog')('mg'),
-    util = require('./lib/util.js');
+    util = require('./lib/util.js'),
+    parallel = require('miniq');
 
 if(typeof window == 'undefined') {
   var najax = require('najax');
@@ -29,7 +30,7 @@ exports.findById = function(name, id, rels, onDone) {
   var result = cache.local(name, id),
       modelClass = meta.model(name);
   if (result) {
-    return onDone(null, result);
+    return onDone && onDone(null, result);
   }
   // call model.fetch
   result = new modelClass({ id: id });
@@ -37,7 +38,7 @@ exports.findById = function(name, id, rels, onDone) {
     // apply hydration
     exports.hydrate(name, model, data);
     // return
-    onDone(null, result);
+    onDone && onDone(null, result);
   });
 };
 
@@ -49,27 +50,32 @@ exports.stream = function(name, rels, onDone) {
     // apply hydration
     exports.hydrate(name, collection, data);
     // return
-    onDone(null, collection);
+    onDone && onDone(null, collection);
   });
+  return collection;
 };
 
 // Model extensions
 
 exports.link = function(name) {
-  return function(instances, onDone) {
-    var tasks = (Array.isArray(instances) ? instances : [ instances ]).map(function() {
-      // make ajax call
-    });
-    // call onDone
+  return function(urlPrefix, models, onDone) {
+    var url = meta.uri(name, this.id);
+    parallel(1, (Array.isArray(models) ? models : [ models ]).map(function(model) {
+      return function(done) {
+        ajax.put(url + urlPrefix + model.id, done);
+      };
+    }), onDone);
   };
 };
 
 exports.unlink = function(name) {
-  return function(instances, onDone) {
-    var tasks = (Array.isArray(instances) ? instances : [ instances ]).map(function() {
-      // make ajax call
-    });
-    // call onDone
+  return function(urlPrefix, models, onDone) {
+    var url = meta.uri(name, this.id);
+    parallel(1, (Array.isArray(models) ? models : [ models ]).map(function(model) {
+      return function(done) {
+        ajax.put(url + urlPrefix + model.id, done);
+      };
+    }), onDone);
   };
 };
 
