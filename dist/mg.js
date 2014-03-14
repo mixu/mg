@@ -34,6 +34,16 @@ exports.cache = cache;
 
 // return a single model by id
 exports.findById = function(name, id, rels, onDone) {
+  // allow findById(name, id, onDone)
+  if (arguments.length == 3) {
+    onDone = rels;
+    rels = undefined;
+  }
+  if (typeof id != 'string' && typeof id != 'number') {
+    throw new Error('.findById: id be string or a number');
+    return;
+  }
+
   // check the cache for the given instance
   var result = cache.local(name, id),
       modelClass = meta.model(name);
@@ -42,12 +52,15 @@ exports.findById = function(name, id, rels, onDone) {
   }
   // call model.fetch
   result = new modelClass({ id: id });
-  result.fetch({ data: rels }).done(function(data) {
-    // apply hydration
-    exports.hydrate(name, model, data);
-    // return
-    onDone && onDone(null, result);
-  });
+
+  if(rels) {
+    result.fetch({ data: rels }).done(function(data) {
+      // apply hydration
+      exports.hydrate(name, result, data);
+      // return
+      onDone && onDone(null, result);
+    });
+  }
 };
 
 // returns a hydrated collection
@@ -425,7 +438,8 @@ var cache = require('./cache.js'),
     forEachRelationValue = require('./hydrate/for-each-relation.js'),
     linker = require('./hydrate/linker.js'),
     merge = require('./hydrate/merge.js'),
-    Collection = require('backbone').Collection;
+    Collection = require('backbone').Collection,
+    log = require('minilog')('mg/hydrate');
 
 function flatten(name, model, inputCache) {
   var idAttr = meta.get(name, 'idAttribute') || 'id',
@@ -455,9 +469,11 @@ function flatten(name, model, inputCache) {
 
 module.exports = function hydrate(name, model, data) {
   if (model instanceof Collection && Array.isArray(data)) {
-    data.forEach(function(item) {
-      model.add(module.exports(name, item, item));
+    var models = data.map(function(item) {
+      return module.exports(name, item, item);
     });
+    // need to call .reset() to force specific order
+    model.reset(models);
     return model;
   }
 
@@ -466,6 +482,12 @@ module.exports = function hydrate(name, model, data) {
       // identify parts
       flat = {};
   flatten(name, data, flat);
+
+  if(!pId) {
+    pId = get(data, idAttr);
+  }
+
+  log.info('hydrate(', name, ',', pId, model, ',', data);
 
   Object.keys(flat).forEach(function(modelClass) {
     var models = flat[modelClass];
@@ -488,6 +510,14 @@ module.exports = function hydrate(name, model, data) {
       cache.store(name, allLinked[name][id]);
     });
   });
+
+  log.info('hydrate results', allLinked, 'returning', name, pId);
+
+  // if the result is different from the input
+  if (model !== flat[name][pId]) {
+    merge.override(name, model, flat[name][pId]);
+  }
+
 
   return flat[name][pId];
 };
@@ -521,7 +551,7 @@ function override(name, old, newer) {
     }
     // override the value
     if(oldVal !== newVal) {
-      log.info('overwrite from cache', key, oldVal, newVal);
+      log.info('overwrite [' + key + ']: ', oldVal, ' = ', newVal);
       util.set(old, key, newVal);
     }
   });
@@ -546,6 +576,7 @@ module.exports = function(name, id, inputCache, cached, isRemote) {
       // - remotely fetched > input cache
       // use the (global) cache result model as the return value
       // but apply the more recent updates from the ongoing hydration to it
+      log.info('Merge override (onto, from) :', cached, inputCache);
       override(name, cached, inputCache);
       result = cached;
 
@@ -558,13 +589,19 @@ module.exports = function(name, id, inputCache, cached, isRemote) {
     }
   }
 
+  log.info('Merge result:', name, id, result);
+
+  /*
   // call model.parse as part of the initialization
   var model = meta.model(name);
   if(model && model.prototype && typeof model.prototype.parse === 'function') {
     result = model.prototype.parse(result);
   }
+  */
   return result;
 };
+
+module.exports.override = override;
 },
 "lib/hydrate/linker.js": function(module, exports, require){
 var meta = require('../meta.js'),
@@ -622,7 +659,10 @@ function linkSingle(name, instance, items) {
 
     // This check must run independently of whether ids is empty
     // so that arrays are converted into collections
-    if(Array.isArray(value) && !isCollection) {
+    var needsCollection = Array.isArray(value);
+    if(!isCollection && (needsCollection || rels[key].isCollection)) {
+      // use the isCollection boolean to indicate that a collection should be initialized
+      // regardless of whether the response e.g. from Create contains a field for it
       log.info('Initializing collection during hydration', key);
       value = new (meta.collection(relType))();
       util.set(instance, key, value);
@@ -638,6 +678,12 @@ function linkSingle(name, instance, items) {
       switch(typeof modelId) {
         case 'number':
         case 'string':
+          // items are not guaranteed to be there for linking since ajax is
+          // up to Backbone
+          if(!items[relType] || !items[relType][modelId]) {
+            log.info('Cannot link', key, 'to', relType, modelId, 'items:', items);
+            return;
+          }
           log.info('Link', key, 'to', relType, modelId, isCollection);
           if(isCollection) {
             value.add(items[relType][modelId]);
@@ -653,7 +699,7 @@ function linkSingle(name, instance, items) {
         case 'object':
           var idAttr = meta.get(relType, 'idAttribute') || 'id',
               id = util.get(modelId, idAttr);
-          if(id) {
+          if(id && items[relType] && items[relType][modelId]) {
             log.info('Link', key, 'to', relType, id, isCollection);
             if(isCollection) {
               value.add(items[relType][id]);
