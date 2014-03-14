@@ -26,6 +26,16 @@ exports.cache = cache;
 
 // return a single model by id
 exports.findById = function(name, id, rels, onDone) {
+  // allow findById(name, id, onDone)
+  if (arguments.length == 3) {
+    onDone = rels;
+    rels = undefined;
+  }
+  if (typeof id != 'string' && typeof id != 'number') {
+    throw new Error('.findById: id be string or a number');
+    return;
+  }
+
   // check the cache for the given instance
   var result = cache.local(name, id),
       modelClass = meta.model(name);
@@ -34,12 +44,15 @@ exports.findById = function(name, id, rels, onDone) {
   }
   // call model.fetch
   result = new modelClass({ id: id });
-  result.fetch({ data: rels }).done(function(data) {
-    // apply hydration
-    exports.hydrate(name, model, data);
-    // return
-    onDone && onDone(null, result);
-  });
+
+  if(rels) {
+    result.fetch({ data: rels }).done(function(data) {
+      // apply hydration
+      exports.hydrate(name, result, data);
+      // return
+      onDone && onDone(null, result);
+    });
+  }
 };
 
 // returns a hydrated collection
