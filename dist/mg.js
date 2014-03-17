@@ -40,7 +40,7 @@ exports.findById = function(name, id, rels, onDone) {
     rels = undefined;
   }
   if (typeof id != 'string' && typeof id != 'number') {
-    throw new Error('.findById: id be string or a number');
+    log.error('.findById: id be string or a number');
     return;
   }
 
@@ -489,6 +489,10 @@ module.exports = function hydrate(name, model, data) {
 
   log.info('hydrate(', name, ',', pId, model, ',', data);
 
+  if(typeof data != 'object') {
+    return model;
+  }
+
   Object.keys(flat).forEach(function(modelClass) {
     var models = flat[modelClass];
     Object.keys(models).forEach(function(id) {
@@ -514,7 +518,7 @@ module.exports = function hydrate(name, model, data) {
   log.info('hydrate results', allLinked, 'returning', name, pId);
 
   // if the result is different from the input
-  if (model !== flat[name][pId]) {
+  if (flat[name] && flat[name][pId] && model !== flat[name][pId]) {
     merge.override(name, model, flat[name][pId]);
   }
 
