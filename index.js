@@ -42,17 +42,15 @@ exports.findById = function(name, id, rels, onDone) {
   if (result) {
     return onDone && onDone(null, result);
   }
+
   // call model.fetch
   result = new modelClass({ id: id });
-
-  if(rels) {
-    result.fetch({ data: rels }).done(function(data) {
-      // apply hydration
-      exports.hydrate(name, result, data);
-      // return
-      onDone && onDone(null, result);
-    });
-  }
+  ( rels ? result.fetch({ data: rels }) : result.fetch()).done(function(data) {
+    // apply hydration
+    exports.hydrate(name, result, data);
+    // return
+    onDone && onDone(null, result);
+  });
 };
 
 // returns a hydrated collection

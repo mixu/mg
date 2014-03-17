@@ -50,17 +50,15 @@ exports.findById = function(name, id, rels, onDone) {
   if (result) {
     return onDone && onDone(null, result);
   }
+
   // call model.fetch
   result = new modelClass({ id: id });
-
-  if(rels) {
-    result.fetch({ data: rels }).done(function(data) {
-      // apply hydration
-      exports.hydrate(name, result, data);
-      // return
-      onDone && onDone(null, result);
-    });
-  }
+  ( rels ? result.fetch({ data: rels }) : result.fetch()).done(function(data) {
+    // apply hydration
+    exports.hydrate(name, result, data);
+    // return
+    onDone && onDone(null, result);
+  });
 };
 
 // returns a hydrated collection
@@ -693,28 +691,20 @@ function linkSingle(name, instance, items) {
             value.add(items[relType][modelId]);
           } else {
             util.set(instance, key, items[relType][modelId]);
-            // set to loaded
-            if(!instance._loadedRels) {
-              instance._loadedRels = {};
-            }
-            instance._loadedRels[key] = true;
           }
           break;
         case 'object':
           var idAttr = meta.get(relType, 'idAttribute') || 'id',
               id = util.get(modelId, idAttr);
-          if(id && items[relType] && items[relType][modelId]) {
+          if(id && items[relType] && items[relType][id]) {
             log.info('Link', key, 'to', relType, id, isCollection);
             if(isCollection) {
               value.add(items[relType][id]);
             } else {
               util.set(instance, key, items[relType][id]);
-              // set to loaded
-              if(!instance._loadedRels) {
-                instance._loadedRels = {};
-              }
-              instance._loadedRels[key] = true;
             }
+          } else {
+            log.info('Cannot link', key, 'to', relType, id, 'items:', items);
           }
       }
     });
