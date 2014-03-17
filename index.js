@@ -32,7 +32,7 @@ exports.findById = function(name, id, rels, onDone) {
     rels = undefined;
   }
   if (typeof id != 'string' && typeof id != 'number') {
-    throw new Error('.findById: id be string or a number');
+    log.error('.findById: id be string or a number');
     return;
   }
 
