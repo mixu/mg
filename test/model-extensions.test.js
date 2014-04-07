@@ -54,6 +54,30 @@ exports['given two subscriptions to a model by id'] = {
     });
   },
 
+  'mg.hydrate should trigger a single change event': function(done) {
+    var post = new Post({ __id: 1}),
+        op = post;
+
+    var changeEventCounter = 0;
+
+    post.on('change', function(model) {
+      changeEventCounter++;
+      // console.log('changeEventCounter', changeEventCounter, model.changed);
+      // console.trace();
+    });
+
+    post.fetch({ data: { rels: 'Comment' } }).done(function(data) {
+      data.first = 'foo';
+      data.second = 'bar';
+
+      assert.equal(changeEventCounter, 0);
+      mg.hydrate('Post', post, data);
+      assert.equal(changeEventCounter, 1);
+
+      done();
+    });
+  },
+
   'model.fetch with multiple items': function() {
     var self = this;
 

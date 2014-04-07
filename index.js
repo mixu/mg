@@ -11,7 +11,6 @@ if(typeof window == 'undefined') {
   var najax = require('najax');
   Backbone.$ = { ajax: function() {
       var args = Array.prototype.slice.call(arguments);
-      // console.log('ajax', args);
       najax.apply(najax, args);
     }
   };
@@ -37,14 +36,14 @@ exports.findById = function(name, id, rels, onDone) {
   }
 
   // check the cache for the given instance
-  var result = cache.local(name, id),
+  var result = cache.local(name, id) || new modelClass({ id: id }),
       modelClass = meta.model(name);
-  if (result) {
+
+  if(result && !rels) {
     return onDone && onDone(null, result);
   }
 
   // call model.fetch
-  result = new modelClass({ id: id });
   ( rels ? result.fetch({ data: rels }) : result.fetch()).done(function(data) {
     // apply hydration
     exports.hydrate(name, result, data);
@@ -87,12 +86,6 @@ exports.unlink = function(name) {
         ajax.put(url + urlPrefix + model.id, done);
       };
     }), onDone);
-  };
-};
-
-exports.sync = function(name) {
- return function(op, model, opts) {
-    return Backbone.sync.apply(this, arguments);
   };
 };
 

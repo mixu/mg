@@ -13,7 +13,6 @@ exports['test cache'] = {
 
   before: function() {
     mg.define('test', Backbone.Model.extend({
-      sync: mg.sync('test'),
       type: 'test',
       urlRoot: 'http://localhost:7000/test/'
     }));
@@ -42,79 +41,40 @@ exports['test cache'] = {
     assert.equal(meta.uri('url2', 2000), 'http://localhost:7000/url2/2000?exclude=foo');
   },
 
-  'can initialize the cache from a json blob and get() an initialized value': function(done) {
+  'can initialize the cache from a json blob and local() an initialized value': function() {
     var values = [
       { id: 100, name: 'a' },
       { id: 200, name: 'b' }
-    ];
+    ], result;
     cache.store('test', values);
 
-    cache.get('test', 100, function(err, result) {
-      assert.strictEqual(values[0], result);
-      cache.get('test', 200, function(err, result) {
-        assert.strictEqual(values[1], result);
-        done();
-      });
-    });
+    result = cache.local('test', 100);
+    assert.strictEqual(values[0], result);
+    result = cache.local('test', 200);
+    assert.strictEqual(values[1], result);
   },
 
-  'can store() and get() a model': function(done) {
-    var item = { id: 300, name: 'foo' };
+  'can store() and local() a model': function() {
+    var item = { id: 300, name: 'foo' },
+        result;
     cache.store('test', item);
-    cache.get('test', 300, function(err, result) {
-      assert.strictEqual(item, result);
-      done();
-    });
+    result = cache.local('test', 300);
+    assert.strictEqual(item, result);
   },
 
-  'fetching a model thats not available causes a external fetch': function(done) {
-    ajax._setAjax(function(uri, method, onDone) {
-      assert.equal('http://localhost:7000/test/9000', uri);
-      onDone(null, { id: 7000});
-      done();
-    });
-    cache.get('test', 9000);
-  },
-
-  'if the external fetch is still pending, do not queue a second external fetch': function(done) {
-    var calls = 0,
-        resultCalls = 0;
-    ajax._setAjax(function(uri, method, onDone) {
-      calls++;
-      if(calls == 1) {
-        setTimeout(function() {
-          onDone(null, { id: 7000, name: 'ok' });
-        }, 10);
-      } else {
-        assert.ok(false, 'Should not be called twice since still pending');
-      }
-    });
-    function results(err, value) {
-      resultCalls++;
-      if(resultCalls == 2) {
-        assert.equal(resultCalls, 2);
-        assert.equal(err, null);
-        assert.equal(value.name, 'ok');
-        done();
-      }
-    }
-    cache.get('test', 7000, results);
-    cache.get('test', 7000, results);
-  },
-
-  'storing an existing model causes it to be updated': function(done) {
-    var item = { id: 7000, name: 'foo' };
+  'storing an existing model causes it to be updated': function() {
+    var item = { id: 7000, name: 'foo' },
+        result;
     cache.store('test', item);
     cache.store('test', { id: 7000, name: 'bar' });
-    cache.get('test', 7000, function(err, result) {
-      assert.strictEqual(item, result);
-      assert.equal(result.name, 'bar');
-      done();
-    });
+    result = cache.local('test', 7000);
+    assert.strictEqual(item, result);
+    assert.equal(result.name, 'bar');
   },
 
-  'can cache an model with a different idAttribute': function(done) {
-    var item = { __id: 7000, name: 'foo' };
+  'can cache an model with a different idAttribute': function() {
+    var item = { __id: 7000, name: 'foo' },
+        result;
     mg.define('AttrTest', Backbone.Model.extend({
       sync: mg.sync('AttrTest'),
       type: 'AttrTest',
@@ -122,12 +82,10 @@ exports['test cache'] = {
       url: 'http://'
     }));
     cache.store('AttrTest', item);
-    cache.get('AttrTest', 7000, function(err, result) {
-      assert.strictEqual(item, result);
-      assert.equal(result.name, 'foo');
-      assert.equal(result.__id, 7000);
-      done();
-    });
+    result = cache.local('AttrTest', 7000);
+    assert.strictEqual(item, result);
+    assert.equal(result.name, 'foo');
+    assert.equal(result.__id, 7000);
   }
 };
 
