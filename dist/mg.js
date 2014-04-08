@@ -19,8 +19,7 @@ if(typeof window == 'undefined') {
   var najax = require('najax');
   Backbone.$ = { ajax: function() {
       var args = Array.prototype.slice.call(arguments);
-      // console.log('ajax', args);
-      najax.apply(najax, args);
+      return najax.apply(najax, args);
     }
   };
 }
@@ -45,14 +44,20 @@ exports.findById = function(name, id, rels, onDone) {
   }
 
   // check the cache for the given instance
-  var result = cache.local(name, id),
-      modelClass = meta.model(name);
-  if (result) {
+  var modelClass = meta.model(name),
+      result = cache.local(name, id);
+
+  if(result && !rels) {
     return onDone && onDone(null, result);
+  }
+  if(!result) {
+    var obj = { },
+        idAttr = meta.get(name, 'idAttribute') || 'id';
+    obj[idAttr] = id;
+    result = new modelClass(obj);
   }
 
   // call model.fetch
-  result = new modelClass({ id: id });
   ( rels ? result.fetch({ data: rels }) : result.fetch()).done(function(data) {
     // apply hydration
     exports.hydrate(name, result, data);
@@ -98,12 +103,6 @@ exports.unlink = function(name) {
   };
 };
 
-exports.sync = function(name) {
- return function(op, model, opts) {
-    return Backbone.sync.apply(this, arguments);
-  };
-};
-
 // excludes the relationships from the JSON output
 exports.toJSON = function(name) {
   return function() {
@@ -124,15 +123,10 @@ exports.toJSON = function(name) {
 };
 },
 "lib/ajax.js": function(module, exports, require){
-if(typeof window == 'undefined') {
-  var url = require('url'),
-      request = require('../test/lib/request.js');
-}
-
-var ajax = (typeof window == 'undefined' ? nodeFetch : jqFetch),
-    log = require('minilog')('mg/ajax'),
+var log = require('minilog')('mg/ajax'),
     MicroEE = require('microee'),
-    queue = new MicroEE();
+    queue = new MicroEE(),
+    ajax;
 
 module.exports = function(uri, onDone) {
   return fetch(uri, 'GET', onDone);
@@ -170,28 +164,12 @@ function fetch(uri, method, onDone) {
   }
 }
 
-function nodeFetch(uri, method, onDone) {
-  // only fetch if we're not already waiting for this resource
-  // parse out the path
-  var parts = url.parse(uri);
+module.exports._setAjax = function(obj) {
+  ajax = obj;
+};
 
-  if(!parts.hostname && !parts.port) {
-    parts.hostname = 'localhost';
-    parts.port = 8000;
-  }
-
-  return request({
-    type: method || 'GET',
-    hostname: parts.hostname,
-    path: parts.pathname,
-    port: parts.port
-  }, function(err, data, res) {
-    onDone(err, data);
-  });
-}
-
-function jqFetch(uri, method, onDone) {
-  $.ajax(uri, {
+ajax = module.exports._nodeFetch = function(uri, method, onDone) {
+  (typeof window == 'undefined' ? require('najax') : $.ajax)(uri, {
       type: method || 'GET',
       dataType: 'json',
       // important: cache must be false, as otherwise jQuery can get into
@@ -208,13 +186,8 @@ function jqFetch(uri, method, onDone) {
         onDone(textStatus, null);
       }
     });
-}
-
-module.exports._setAjax = function(obj) {
-  ajax = obj;
 };
 
-module.exports._nodeFetch = nodeFetch;
 },
 "lib/meta.js": function(module, exports, require){
 var log = require('minilog')('mg/meta'),
@@ -250,18 +223,6 @@ exports.uri = function(name, id) {
     obj = new (exports.model(name))(attr);
   }
   return util.result(obj, 'url'); // call .url() or return .url
-};
-
-exports.collectionUri = function(name) {
-  // get the collection (e.g. defined as { collection: 'Posts' } in each model class)
-  var collectionClass = exports.collection(name),
-      collection;
-  if(collectionClass !== Collection) {
-    collection = new collectionClass();
-    return util.result(collection, 'url'); // call .url() or return .url
-  } else {
-    return exports.uri(name);
-  }
 };
 
 // get the model class for the given name
@@ -303,17 +264,10 @@ exports.define = function(name, mmeta) {
 
 },
 "lib/util.js": function(module, exports, require){
-// Makes it easier to work with things that are either
-// plain objects (direct access via obj[key]) or Backbone models
-// (access via obj.get(key)). Calls the getter if it exists,
-// otherwise returns the property.
+// Calls the getter if it exists, otherwise returns the property.
 exports.get = function(obj, key) {
   if(!obj) return '';
-  if(typeof obj.get == 'function') {
-    return obj.get(key);
-  } else {
-    return obj[key];
-  }
+  return (typeof obj.get == 'function' ? obj.get(key) : obj[key]);
 };
 
 // Similar to `_.result`: If the value of the named property is a function
@@ -325,9 +279,12 @@ exports.result = function(obj, key) {
 };
 
 // call setter if exists, otherwise set property
-exports.set = function(obj, key, value) {
+exports.set = function(obj, key, value, options) {
+  if(arguments.length === 2) {
+    value = key;
+  }
   if(typeof obj.set == 'function') {
-    return obj.set(key, value);
+    return obj.set(key, value, options);
   } else {
     obj[key] = value;
   }
@@ -339,8 +296,7 @@ exports.keys = function(obj) {
 };
 },
 "lib/cache.js": function(module, exports, require){
-var ajax = require('./ajax.js'),
-    meta = require('./meta.js'),
+var meta = require('./meta.js'),
     util = require('./util.js'),
     log = require('minilog')('mg/cache'),
     Collection = require('backbone').Collection,
@@ -356,39 +312,6 @@ exports.local = function local(name, id) {
 // Get all ids
 exports.keys = function(name) {
   return (cache[name] ? Object.keys(cache[name]) : []);
-};
-
-exports.getAll = function(name, onDone) {
-  var localItems = exports.keys(name).map(function(id) {
-    return exports.local(name, id);
-  });
-
-  var uri = meta.collectionUri(name);
-  log.info('listRemote', name, uri);
-  if(!uri) {
-    console.error('Unknown collection URL: ' +name);
-  }
-
-  ajax(uri, function(err, data) {
-    hydrate(name, data, function(err, remoteItems) {
-      onDone(err, localItems.concat(remoteItems ? remoteItems : []));
-    });
-  });
-};
-
-// Location-unaware `get model`
-exports.get = function get(name, id, onDone) {
-  var item = exports.local(name, id);
-  if(item) {
-    log.debug('Fulfilling .get() from local cache', name, id);
-    return onDone(undefined, item);
-  }
-  // do remote fetch if not locally available
-  if(!meta.get(name, 'url')) {
-    throw new Error(name + ' does not have a definition.');
-  }
-  var uri = meta.uri(name, id);
-  ajax(uri, onDone);
 };
 
 exports.store = function(name, values) {
@@ -434,36 +357,10 @@ var cache = require('./cache.js'),
     util = require('./util.js'),
     get = util.get,
     forEachRelationValue = require('./hydrate/for-each-relation.js'),
-    linker = require('./hydrate/linker.js'),
+    linkSingle = require('./hydrate/linker.js'),
     merge = require('./hydrate/merge.js'),
     Collection = require('backbone').Collection,
     log = require('minilog')('mg/hydrate');
-
-function flatten(name, model, inputCache) {
-  var idAttr = meta.get(name, 'idAttribute') || 'id',
-      id = get(model, idAttr);
-  if(id) {
-    if(!inputCache[name]) {
-      inputCache[name] = {};
-    }
-    inputCache[name][id] = model;
-  }
-
-  forEachRelationValue(name, model, function(key, relType, model) {
-      // items may be either numbers, strings or models
-      switch(typeof model) {
-        case 'object':
-          var idAttr = meta.get(relType, 'idAttribute') || 'id',
-              id = util.get(model, idAttr);
-          if(id) {
-            if(!inputCache[relType]) {
-              inputCache[relType] = {};
-            }
-            inputCache[relType][id] = model;
-          }
-      }
-  });
-}
 
 module.exports = function hydrate(name, model, data) {
   if (model instanceof Collection && Array.isArray(data)) {
@@ -477,13 +374,33 @@ module.exports = function hydrate(name, model, data) {
 
   var idAttr = meta.get(name, 'idAttribute') || 'id',
       pId = get(model, idAttr),
-      // identify parts
       flat = {};
-  flatten(name, data, flat);
 
   if(!pId) {
     pId = get(data, idAttr);
   }
+
+  if(pId) {
+    if(!flat[name]) {
+      flat[name] = {};
+    }
+    flat[name][pId] = data;
+  }
+
+  forEachRelationValue(name, data, function(key, relType, model) {
+      // items may be either numbers, strings or models
+      switch(typeof model) {
+        case 'object':
+          var idAttr = meta.get(relType, 'idAttribute') || 'id',
+              id = util.get(model, idAttr);
+          if(id) {
+            if(!flat[relType]) {
+              flat[relType] = {};
+            }
+            flat[relType][id] = model;
+          }
+      }
+  });
 
   log.info('hydrate(', name, ',', pId, model, ',', data);
 
@@ -505,23 +422,37 @@ module.exports = function hydrate(name, model, data) {
   });
 
   // run linker
-  var allLinked = linker(flat);
-  Object.keys(allLinked).forEach(function(name) {
-    Object.keys(allLinked[name]).forEach(function(id) {
+  // all models must be instantiated first
+  Object.keys(flat).forEach(function(name) {
+    Object.keys(flat[name]).forEach(function(id) {
+      var modelClass = meta.model(name);
+      // instantiate the model if necessary
+      if(!(flat[name][id] instanceof modelClass)) {
+        log.info('Not an instance of ' + name + ', instantiating model for', id);
+        flat[name][id] = new modelClass(flat[name][id]);
+      }
+    });
+  });
+  // iterate each model in flat
+  Object.keys(flat).forEach(function(name) {
+    Object.keys(flat[name]).forEach(function(id) {
+      // link the rels
+      flat[name][id] = linkSingle(name, flat[name][id], flat);
       // update the model cache with the new model
-      cache.store(name, allLinked[name][id]);
+      cache.store(name, flat[name][id]);
     });
   });
 
-  log.info('hydrate results', allLinked, 'returning', name, pId);
+  log.info('hydrate results', flat, 'returning', name, pId);
 
   // if the result is different from the input
-  if (flat[name] && flat[name][pId] && model !== flat[name][pId]) {
-    merge.override(name, model, flat[name][pId]);
+  if (flat[name] && flat[name][pId]) {
+    if (model !== flat[name][pId]) {
+      merge.override(name, model, flat[name][pId]);
+    }
+    return flat[name][pId];
   }
-
-
-  return flat[name][pId];
+  return model;
 };
 },
 "lib/hydrate/merge.js": function(module, exports, require){
@@ -530,7 +461,8 @@ var meta = require('../meta.js'),
     log = require('minilog')('mg/merge');
 
 function override(name, old, newer) {
-  var rels = meta.get(name, 'rels');
+  var rels = meta.get(name, 'rels'),
+      setValues = {};
   if(!newer) {
     return;
   }
@@ -554,9 +486,14 @@ function override(name, old, newer) {
     // override the value
     if(oldVal !== newVal) {
       log.info('overwrite [' + key + ']: ', oldVal, ' = ', newVal);
-      util.set(old, key, newVal);
+      setValues[key] = newVal;
     }
   });
+
+  // to avoid triggering multiple backbone events
+  if(util.keys(setValues).length > 0) {
+    util.set(old, setValues);
+  }
 }
 
 module.exports = function(name, id, inputCache, cached, isRemote) {
@@ -592,14 +529,6 @@ module.exports = function(name, id, inputCache, cached, isRemote) {
   }
 
   log.info('Merge result:', name, id, result);
-
-  /*
-  // call model.parse as part of the initialization
-  var model = meta.model(name);
-  if(model && model.prototype && typeof model.prototype.parse === 'function') {
-    result = model.prototype.parse(result);
-  }
-  */
   return result;
 };
 
@@ -611,33 +540,8 @@ var meta = require('../meta.js'),
     log = require('minilog')('mg/link'),
     Collection = require('backbone').Collection;
 
-module.exports = function(items) {
-  var self = this;
-  // all models must be instantiated first
-  Object.keys(items).forEach(function(name) {
-    Object.keys(items[name]).forEach(function(id) {
-      var modelClass = meta.model(name);
-      // instantiate the model if necessary
-      if(!(items[name][id] instanceof modelClass)) {
-        log.info('Not an instance of ' + name + ', instantiating model for', id);
-        items[name][id] = new modelClass(items[name][id]);
-      }
-    });
-  });
-  // iterate each model in the items
-  Object.keys(items).forEach(function(name) {
-    Object.keys(items[name]).forEach(function(id) {
-      // link the rels
-      items[name][id] = linkSingle(name, items[name][id], items);
-    });
-  });
-
-  // return all linked
-  return items;
-};
-
 // link a single model to its dependencies
-function linkSingle(name, instance, items) {
+module.exports = function(name, instance, items) {
    // check its rels, and store the appropriate link
   var self = this,
       rels = meta.get(name, 'rels'),
@@ -667,7 +571,7 @@ function linkSingle(name, instance, items) {
       // regardless of whether the response e.g. from Create contains a field for it
       log.info('Initializing collection during hydration', key);
       value = new (meta.collection(relType))();
-      util.set(instance, key, value);
+      util.set(instance, key, value, { silent: true });
       isCollection = true;
     }
 
@@ -677,42 +581,33 @@ function linkSingle(name, instance, items) {
     }
     (Array.isArray(ids) ? ids : [ ids ]).forEach(function(modelId) {
       // items may be either numbers, strings or models
+      var id, idAttr;
       switch(typeof modelId) {
         case 'number':
         case 'string':
-          // items are not guaranteed to be there for linking since ajax is
-          // up to Backbone
-          if(!items[relType] || !items[relType][modelId]) {
-            log.info('Cannot link', key, 'to', relType, modelId, 'items:', items);
-            return;
-          }
-          log.info('Link', key, 'to', relType, modelId, isCollection);
-          if(isCollection) {
-            value.add(items[relType][modelId]);
-          } else {
-            util.set(instance, key, items[relType][modelId]);
-          }
+          id = modelId;
           break;
         case 'object':
-          var idAttr = meta.get(relType, 'idAttribute') || 'id',
-              id = util.get(modelId, idAttr);
-          if(id && items[relType] && items[relType][id]) {
-            log.info('Link', key, 'to', relType, id, isCollection);
-            if(isCollection) {
-              value.add(items[relType][id]);
-            } else {
-              util.set(instance, key, items[relType][id]);
-            }
-          } else {
-            log.info('Cannot link', key, 'to', relType, id, 'items:', items);
-          }
+          idAttr = meta.get(relType, 'idAttribute') || 'id';
+          id = util.get(modelId, idAttr);
+      }
+      if(id) {
+        // items are not guaranteed to be there for linking since ajax is up to Backbone
+        if(!items[relType] || !items[relType][id]) {
+          log.info('Cannot link', key, 'to', relType, id, 'items:', items);
+          return;
+        }
+        log.info('Link', key, 'to', relType, id, isCollection);
+        if(isCollection) {
+          value.add(items[relType][id]);
+        } else {
+          util.set(instance, key, items[relType][id], { silent: true });
+        }
       }
     });
   });
   return instance;
 }
-
-module.exports.linkSingle = linkSingle;
 },
 "lib/hydrate/for-each-relation.js": function(module, exports, require){
 var meta = require('../meta.js'),
