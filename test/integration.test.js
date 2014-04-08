@@ -77,10 +77,14 @@ exports['given a simple model'] = {
     'when hydrating a collection of items and the collection is empty, do not create any models': function(done) {
       mg.define('CollectionTest', Backbone.Model.extend({
         url: 'http://localhost:8721/collectiontest/',
-        sync: mg.sync('CollectionTest')
+        collection: 'CollectionTests'
       }));
 
-      mg.stream('CollectionTest' , { }, function(err, collection) {
+      mg.define('CollectionTests', Backbone.Collection.extend({
+          url: 'http://localhost:8721/collectiontest/'
+      }));
+
+      mg.stream('CollectionTest', { }, function(err, collection) {
         assert.ok(collection instanceof Backbone.Collection);
         assert.equal(collection.length, 0);
         done();
@@ -90,7 +94,6 @@ exports['given a simple model'] = {
     'after hydrating a circular JSON structure, can call toJSON safely': function(done) {
       mg.define('Circular', Backbone.Model.extend({
         urlRoot: 'http://localhost:8721/circular/',
-        sync: mg.sync('Circular'),
         rels: {
           other: {
             type: 'Circular'
@@ -109,18 +112,8 @@ exports['given a simple model'] = {
 
         done();
       });
-    },
+    }
 
-    'findById(..., [ id1, id2 ], should work': function(done) {
-      mg.findById('Post', [1, 2], function(err, val) {
-        assert.ok(Array.isArray(val));
-        assert.equal(val[0].get('__id'), 1);
-        assert.ok(val[0] instanceof Post);
-        assert.equal(val[1].get('__id'), 2);
-        assert.ok(val[1] instanceof Post);
-        done();
-      });
-    },
   },
 
   'streaming a collection twice': {
@@ -136,7 +129,7 @@ exports['given a simple model'] = {
         });
       });
     },
-
+/*
     'the 2nd instance\'s collection obj should be === to the 1st': function(done) {
       var collection = mg.stream('Post', { }, function(err, value) {
         // store the value now (since lookup can change due to hydration)
@@ -149,7 +142,7 @@ exports['given a simple model'] = {
         });
       });
     }
-
+*/
   },
 
   'if the model defines a .parse function, it is called': {
@@ -159,7 +152,6 @@ exports['given a simple model'] = {
       self.parseCalls = 0;
       mg.define('ParseHydration', Backbone.Model.extend({
         urlRoot: 'http://localhost:8721/parsehydration/',
-        sync: mg.sync('ParseHydration'),
         parse: function(responseJSON, options) {
           self.parseCalls++;
           responseJSON.foo = 'bar';
@@ -190,7 +182,6 @@ exports['given a simple model'] = {
     'if the backend adds a new property that is a hydratable model id, hydrate it': function(done) {
       var ResponseTest = mg.define('ResponseTest', Backbone.Model.extend({
         url: 'http://localhost:8721/ResponseTest',
-        sync: mg.sync('ResponseTest'),
         rels: {
           child: { type: 'Comment' }
         }
@@ -198,7 +189,10 @@ exports['given a simple model'] = {
 
       server.once('POST /ResponseTest', function(req, res) {
         req.body.id = 1;
-        req.body.child = 1234;
+        req.body.child = {
+          id: 1234,
+          name: 'foo'
+        };
         res.setHeader('content-type', 'application/json');
         res.end(JSON.stringify(req.body));
       });
@@ -210,39 +204,16 @@ exports['given a simple model'] = {
 
 
       var instance = new ResponseTest();
-      instance.save({ name: 'foo' }, {
-        success: function() {
-          // console.log(instance);
-          assert.ok(instance instanceof ResponseTest);
-          assert.equal(instance.get('name'), 'foo');
-          assert.equal(instance.get('id'), 1);
-          assert.ok(instance.get('child') instanceof Comment);
-          assert.equal(instance.get('child').get('id'), 1234);
-          done();
-        }
+      instance.save({ name: 'foo' }).done(function(data) {
+        mg.hydrate('ResponseTest', instance, data);
+        console.log(instance);
+        assert.ok(instance instanceof ResponseTest);
+        assert.equal(instance.get('name'), 'foo');
+        assert.equal(instance.get('id'), 1);
+        assert.ok(instance.get('child') instanceof Comment);
+        assert.equal(instance.get('child').get('id'), 1234);
+        done();
       });
-    },
-
-    'dehydrate property that is a single model needs to be converted to an ID': function() {
-
-    },
-
-    'dehydrate property that is a collection needs to be converted to an array of IDs': function() {
-
-    }
-  },
-
-  'delete': {
-    'delete should remove model from regular collections': function() {
-
-    },
-
-    'delete should remove model from streamed collections': function() {
-
-    },
-
-    'delete should remove model from the cache': function() {
-
     }
   }
 

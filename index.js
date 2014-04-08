@@ -11,7 +11,7 @@ if(typeof window == 'undefined') {
   var najax = require('najax');
   Backbone.$ = { ajax: function() {
       var args = Array.prototype.slice.call(arguments);
-      najax.apply(najax, args);
+      return najax.apply(najax, args);
     }
   };
 }
@@ -36,11 +36,17 @@ exports.findById = function(name, id, rels, onDone) {
   }
 
   // check the cache for the given instance
-  var result = cache.local(name, id) || new modelClass({ id: id }),
-      modelClass = meta.model(name);
+  var modelClass = meta.model(name),
+      result = cache.local(name, id);
 
   if(result && !rels) {
     return onDone && onDone(null, result);
+  }
+  if(!result) {
+    var obj = { },
+        idAttr = meta.get(name, 'idAttribute') || 'id';
+    obj[idAttr] = id;
+    result = new modelClass(obj);
   }
 
   // call model.fetch

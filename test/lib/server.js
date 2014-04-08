@@ -88,7 +88,7 @@ CollectionServer.prototype.addRest = function(collection) {
   // add LIST / search
   this.app.get(new RegExp('^/'+collection+'/?$'), function(req, res, match) {
     var results = self.cache[collection];
-    if(results.length > 0) {
+    if(results) {
       res.setHeader('Content-Type', 'application/json');
       res.end(JSON.stringify(results));
       return;

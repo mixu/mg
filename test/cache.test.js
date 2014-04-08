@@ -25,14 +25,12 @@ exports['test cache'] = {
   'can get the url': function() {
     // example 1: when urlRoot is set
     mg.define('url1', Backbone.Model.extend({
-      sync: mg.sync('url1'),
       type: 'url1',
       urlRoot: 'http://localhost:7000/url1/'
     }));
     assert.equal(meta.uri('url1', 1000), 'http://localhost:7000/url1/1000');
     // example 2: when url is a function
     mg.define('url2', Backbone.Model.extend({
-      sync: mg.sync('url2'),
       type: 'url2',
       url: function() {
         return 'http://localhost:7000/url2/' + encodeURIComponent(this.id) + '?exclude=foo';
@@ -76,7 +74,6 @@ exports['test cache'] = {
     var item = { __id: 7000, name: 'foo' },
         result;
     mg.define('AttrTest', Backbone.Model.extend({
-      sync: mg.sync('AttrTest'),
       type: 'AttrTest',
       idAttribute: '__id',
       url: 'http://'

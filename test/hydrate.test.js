@@ -11,14 +11,12 @@ var assert = require('assert'),
 
 // Model definitions
 var SimpleModel = Backbone.Model.extend({
-  urlRoot: 'http://test/SimpleModel',
-  sync: mg.sync('SimpleModel')
+  urlRoot: 'http://test/SimpleModel'
 });
 mg.define('SimpleModel', SimpleModel);
 
 var ModelWithChild = Backbone.Model.extend({
   urlRoot: 'http://test/ModelWithChild',
-  sync: mg.sync('ModelWithChild'),
   rels: {
     child: { type: 'SimpleModel' }
   }
@@ -27,7 +25,6 @@ mg.define('ModelWithChild', ModelWithChild);
 
 var ModelWithGrandChild = Backbone.Model.extend({
   urlRoot: 'http://test/ModelWithGrandChild',
-  sync: mg.sync('ModelWithGrandChild'),
   rels: {
     child: { type: 'ModelWithChild' }
   }
@@ -37,7 +34,6 @@ mg.define('ModelWithGrandChild', ModelWithGrandChild);
 exports['hydrate values...'] = {
   'date string as date object': function() {
     var WithDate = Backbone.Model.extend({
-      sync: mg.sync('WithDate'),
       rels: {
         'date': { type: Date }
       }
@@ -51,7 +47,6 @@ exports['hydrate values...'] = {
 
   'regexp string as regexp object': function() {
     var WithRe = Backbone.Model.extend({
-      sync: mg.sync('WithRe'),
       rels: {
         're': { type: RegExp }
       }
@@ -65,7 +60,6 @@ exports['hydrate values...'] = {
 
   'hydrate a default value': function() {
     var WithDefault = Backbone.Model.extend({
-      sync: mg.sync('WithDefault'),
       rels: {
         'foo': { type: String, default: 'bar' }
       }
@@ -108,74 +102,53 @@ exports['hydrate associations...'] = {
 
   'hydrate': {
 
-    'a model with no associations': function(done) {
-      mg.hydrate('Comment', { text: 'foo' }, function(err, comment) {
-        assert.ok(comment instanceof Model.Comment);
-        assert.equal(comment.get('text'), 'foo');
-        done();
-      });
+    'a model with no associations': function() {
+      var model = new Model.Comment();
+      mg.hydrate('Comment', model, { id: 1, text: 'foo' });
+
+      var comment = model;
+      assert.ok(comment instanceof Model.Comment);
+      assert.equal(comment.get('text'), 'foo');
     },
 
-/* array syntax deprecated
-    'an array of no-assoc models': function(done) {
-      mg.hydrate('Comment', [ { text: 'foo' }, { text: 'bar' } ], function(err, results) {
-        assert.ok(Array.isArray(results));
-        assert.ok(results[0] instanceof Model.Comment);
-        assert.equal(results[0].get('text'), 'foo');
-        assert.ok(results[1] instanceof Model.Comment);
-        assert.equal(results[1].get('text'), 'bar');
-        done();
-      });
-    },
-*/
+    'a model with an association': function() {
+      var self = this,
+          model = new Model.Post();
 
-    // TODO: test where the data is locally available and cache returns a 404
-
-    'a model with an association': function(done) {
-      var self = this;
-      mg.hydrate('Post', {
+      mg.hydrate('Post', model, {
           __id: 1,
           name: 'Foo',
-          author: 1000
-        }, function(err, val) {
-        console.log(val);
-        assert.ok(val instanceof Model.Post);
-        // check that the model id is correct
-        assert.equal(val.get('__id'), 1);
-        assert.equal(val.get('name'), 'Foo');
-        // and the model contains a child model, author
-        assert.ok(val.get('author') instanceof Model.Person);
-        assert.equal(val.get('author').get('name'), 'Bar');
+          author: {
+            id: 1000,
+            name: 'Bar'
+          }
+        });
 
-        self.postInstance = val;
+      var val = model;
 
-        done();
-      });
+      assert.ok(val instanceof Model.Post);
+      // check that the model id is correct
+      assert.equal(val.get('__id'), 1);
+      assert.equal(val.get('name'), 'Foo');
+      // and the model contains a child model, author
+      assert.ok(val.get('author') instanceof Model.Person);
+      assert.equal(val.get('author').get('name'), 'Bar');
+
+      self.postInstance = val;
     },
 
-    'hydrate(..., id) is interpreted as hydrate(..., { id: id})': function(done) {
-      mg.hydrate('Post', 1, function(err, val) {
-        assert.ok(val instanceof Model.Post);
-        assert.equal(val.get('__id'), 1);
-        done();
-      });
-    },
-
-    'hydrating a empty array should return a collection': function(done) {
+    'hydrating a empty array should return a collection': function() {
       cache.store('Post', { __id: 1000 });
 
-      mg.hydrate('Post', { __id: 1000, author: [] }, function(err, val) {
-        assert.ok(val instanceof Model.Post);
-        assert.equal(val.get('__id'), 1000);
-        assert.ok(val.get('author') instanceof Backbone.Collection);
-        assert.equal(val.get('author').length, 0);
-        done();
-      });
+      var val = mg.hydrate('Post', new Model.Post(), { __id: 1000, author: [] });
+      assert.ok(val instanceof Model.Post);
+      assert.equal(val.get('__id'), 1000);
+      assert.ok(val.get('author') instanceof Backbone.Collection);
+      assert.equal(val.get('author').length, 0);
     },
 
-    'a model with two associations': function(done) {
+    'a model with two associations': function() {
       var AAA = Backbone.Model.extend({
-        sync: mg.sync('AAA'),
         rels: {
           'first': { type: 'ModelWithChild' },
           'second': { type: 'SimpleModel' }
@@ -183,47 +156,57 @@ exports['hydrate associations...'] = {
       });
       mg.define('AAA', AAA);
 
-      mg.hydrate('AAA', {
+      var model = mg.hydrate('AAA', new AAA(), {
+        id: 11,
         name: 'AAA',
-        first: 1,
-        second: 2
-      }, function(err, model) {
-        assert.equal('AAA', model.get('name'));
-        var first = model.get('first');
-        assert.ok(first instanceof ModelWithChild);
-        assert.equal(1, first.get('id'));
-        assert.equal('Child1', first.get('name'));
-        var second = model.get('second');
-        assert.ok(second instanceof SimpleModel);
-        assert.equal(2, second.get('id'));
-        assert.equal('Simple2', second.get('name'));
-        done();
+        first: { id: 1, name: 'Child1' },
+        second: { id: 2, name: 'Simple2' }
       });
+
+      assert.equal('AAA', model.get('name'));
+      var first = model.get('first');
+      assert.ok(first instanceof ModelWithChild);
+      assert.equal(1, first.get('id'));
+      assert.equal('Child1', first.get('name'));
+      var second = model.get('second');
+      assert.ok(second instanceof SimpleModel);
+      assert.equal(2, second.get('id'));
+      assert.equal('Simple2', second.get('name'));
     },
 
-    'a model with an association that has a child association': function(done) {
-      mg.hydrate('ModelWithGrandChild', {
+    /* depth-2 is not supported
+    'a model with an association that has a child association': function() {
+      var model = mg.hydrate('ModelWithGrandChild', new ModelWithGrandChild(), {
+        id: 111,
         name: 'OP',
-        child: 1
-      }, function(err, model) {
-        assert.equal('OP', model.get('name'));
-        var current = model.get('child');
-        assert.ok(current instanceof ModelWithChild);
-        assert.equal(1, current.get('id'));
-        assert.equal('Child1', current.get('name'));
-        current = current.get('child');
-        assert.ok(current instanceof SimpleModel);
-        assert.ok(!(current instanceof ModelWithChild));
-        assert.equal(1, current.get('id'));
-        assert.equal('Simple1', current.get('name'));
-        done();
+        child: {
+          id: 1,
+          name: 'Child1',
+          child: {
+            id: 1,
+            name: 'Simple1'
+          }
+        }
       });
-    },
 
-    'a model with a circular association': function(done) {
+      assert.equal('OP', model.get('name'));
+      var current = model.get('child');
+      assert.ok(current instanceof ModelWithChild);
+      assert.equal(1, current.get('id'));
+      assert.equal('Child1', current.get('name'));
+      current = current.get('child');
+
+
+      assert.ok(current instanceof SimpleModel);
+      assert.ok(!(current instanceof ModelWithChild));
+      assert.equal(1, current.get('id'));
+      assert.equal('Simple1', current.get('name'));
+    },
+    */
+
+    'a model with a circular association': function() {
       var FFF = Backbone.Model.extend({
         urlRoot: 'http://test/FFF/',
-        sync: mg.sync('FFF'),
         rels: {
           child: { type: 'GGG' }
         }
@@ -231,78 +214,72 @@ exports['hydrate associations...'] = {
       mg.define('FFF', FFF);
       var GGG = Backbone.Model.extend({
         urlRoot: 'http://test/GGG',
-        sync: mg.sync('GGG'),
         rels: {
           parent: { type: 'FFF' }
         }
       });
       mg.define('GGG', GGG);
 
-      cache.store('GGG', { id: 6000, name: 'GGG', parent: 5000 });
+      mg.hydrate('GGG', new GGG(), { id: 6000, name: 'GGG', parent: { id: 5000 } });
 
-      mg.hydrate('FFF', { id: 5000, name: 'FFF', child: 6000 }, function(err, model) {
-        // console.log(util.inspect(model, null, 30, true));
-        assert.equal('FFF', model.get('name'));
-        var a = model.get('child');
-        assert.equal('GGG', a.get('name'));
-        assert.strictEqual(model, model.get('child').get('parent'));
-        done();
-      });
+      var model = mg.hydrate('FFF', new FFF(), { id: 5000, name: 'FFF', child: { id: 6000 } });
+      // console.log(util.inspect(model, null, 30, true));
+      assert.equal('FFF', model.get('name'));
+      var a = model.get('child');
+      assert.equal('GGG', a.get('name'));
+      assert.strictEqual(model, model.get('child').get('parent'));
     },
 
-    'a model with a one to many relationship as a Collection': function(done) {
-      cache.store('Post', { __id: 200 });
-      cache.store('Comment', { id: 100, value: 'C1' });
-      cache.store('Comment', { id: 200, value: 'C2' });
+    'a model with a one to many relationship as a Collection': function() {
+      mg.hydrate('Comment', new Model.Comment(), { id: 100, value: 'C1' });
+      mg.hydrate('Comment', new Model.Comment(), { id: 200, value: 'C2' });
 
-      mg.hydrate('Post', {
+      var val = mg.hydrate('Post', new Model.Post(), {
           __id: 200,
           name: 'Foo',
-          comments: [ 100, 200 ]
-        }, function(err, val) {
-        assert.ok(val instanceof Model.Post);
-        assert.equal(val.get('__id'), 200);
-        assert.equal(val.get('name'), 'Foo');
-        var collection = val.get('comments');
-        // console.log(util.inspect(collection, null, 30, true));
-        assert.ok(collection instanceof Backbone.Collection);
-        assert.deepEqual(collection.pluck('value'), [ 'C1', 'C2']);
-        done();
-      });
+          comments: [ { id: 100 }, { id: 200 } ]
+        });
+      assert.ok(val instanceof Model.Post);
+      assert.equal(val.get('__id'), 200);
+      assert.equal(val.get('name'), 'Foo');
+      var collection = val.get('comments');
+      // console.log(util.inspect(collection, null, 30, true));
+      assert.ok(collection instanceof Backbone.Collection);
+      assert.deepEqual(collection.pluck('value'), [ 'C1', 'C2']);
     },
 
-    'if the model to be hydrated exists in cache, then update and reuse the cached model': function(done) {
+    'if the model to be hydrated exists in cache, then update and reuse the cached model': function() {
       var self = this;
 
-      mg.hydrate('Post', { __id: 223344, name: 'Ancient post' },
-        function(err, postInstance) {
+      var postInstance = mg.hydrate('Post', new Model.Post(), { __id: 223344, name: 'Ancient post' });
 
-        self.ajaxCalls = [];
+      assert.ok(cache.local('Post', 223344));
 
-        assert.ok(cache.local('Post', 223344));
-
-        mg.hydrate('Post', {
+      var val = mg.hydrate('Post', new Model.Post(), {
             __id: 223344,
             name: 'New post',
-            author: 1000
-          }, function(err, val) {
-          // assert that no ajax calls were made
-          assert.equal(self.ajaxCalls.length, 0);
+            author: {
+              id: 124,
+              name: 'Bar'
+            }
+          });
 
-          // assert that the instance was reused
-          assert.strictEqual(val, postInstance);
+      // assert that the instance was reused
+      assert.notStrictEqual(val, postInstance);
 
-          // with updated value
-          assert.equal(val.get('name'), 'New post');
-          // and the rest of the data is like before
-          assert.equal(val.get('__id'), 223344);
-          assert.equal(val.get('author').get('name'), 'Bar');
-
-          done();
-        });
-      });
+      // with updated value
+      assert.equal(val.get('name'), 'New post');
+      // and the rest of the data is like before
+      assert.equal(val.get('__id'), 223344);
+      assert.equal(val.get('author').get('name'), 'Bar');
+      // with updated value
+      assert.equal(postInstance.get('name'), 'New post');
+      // and the rest of the data is like before
+      assert.equal(postInstance.get('__id'), 223344);
+      assert.equal(postInstance.get('author').get('name'), 'Bar');
     },
 
+    /*
     // Cache precedence:
     // 1) top priority: any values passed directly to Hydrate
     // 2) second priority: any values from the server
@@ -333,6 +310,7 @@ exports['hydrate associations...'] = {
         });
       });
     },
+
 
     // for newly created models, we have an instance of the model already,
     // and the purpose of hydration is to assign an id and to hydrate any new dependent properties
@@ -389,6 +367,7 @@ exports['hydrate associations...'] = {
         done();
       });
     }
+  */
   }
 };
 

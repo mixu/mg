@@ -1,6 +1,7 @@
+TESTS += test/ajax.test.js
 TESTS += test/cache.test.js
-# TESTS += test/hydrate.test.js
-# TESTS += test/integration.test.js
+TESTS += test/hydrate.test.js
+TESTS += test/integration.test.js
 TESTS += test/model-extensions.test.js
 TESTS += test/notify_local.test.js
 TESTS += test/validation.test.js
