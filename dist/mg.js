@@ -408,6 +408,23 @@ module.exports = function hydrate(name, model, data) {
     return model;
   }
 
+  // all models must be instantiated first
+  // Note: here the goal is to have the flat array contain all the
+  // canonical instances; this is important because we are updating collections
+  // during the merge, and look up the id => instance from the flat hash
+  Object.keys(flat).forEach(function(name) {
+    Object.keys(flat[name]).forEach(function(id) {
+      var modelClass = meta.model(name);
+      // instantiate the model if necessary
+      var local = cache.local(modelClass, id),
+          isInstanceOf = flat[name][id] instanceof modelClass;
+      if(!local && !isInstanceOf) {
+        log.info('Not an instance of ' + name + ', instantiating model for', id);
+        flat[name][id] = new modelClass(flat[name][id]);
+      }
+    });
+  });
+
   Object.keys(flat).forEach(function(modelClass) {
     var models = flat[modelClass];
     Object.keys(models).forEach(function(id) {
@@ -417,22 +434,11 @@ module.exports = function hydrate(name, model, data) {
         local = model;
       }
       // if it does, then update it, else instantiate it
-      flat[modelClass][id] = merge(modelClass, id, flat[modelClass][id], local, false);
+      flat[modelClass][id] = merge(modelClass, id, flat[modelClass][id], local, flat);
     });
   });
 
   // run linker
-  // all models must be instantiated first
-  Object.keys(flat).forEach(function(name) {
-    Object.keys(flat[name]).forEach(function(id) {
-      var modelClass = meta.model(name);
-      // instantiate the model if necessary
-      if(!(flat[name][id] instanceof modelClass)) {
-        log.info('Not an instance of ' + name + ', instantiating model for', id);
-        flat[name][id] = new modelClass(flat[name][id]);
-      }
-    });
-  });
   // iterate each model in flat
   Object.keys(flat).forEach(function(name) {
     Object.keys(flat[name]).forEach(function(id) {
@@ -458,9 +464,10 @@ module.exports = function hydrate(name, model, data) {
 "lib/hydrate/merge.js": function(module, exports, require){
 var meta = require('../meta.js'),
     util = require('../util.js'),
+    Model = require('backbone').Model,
     log = require('minilog')('mg/merge');
 
-function override(name, old, newer) {
+function override(name, old, newer, flat) {
   var rels = meta.get(name, 'rels'),
       setValues = {};
   if(!newer) {
@@ -468,19 +475,39 @@ function override(name, old, newer) {
   }
 
   util.keys(newer).forEach(function(key) {
-    var idAttr, oldVal, newVal, relType, isCollection;
+    var idAttr, oldVal, newVal, relType, isCollection, relType;
     oldVal = util.get(old, key);
     newVal = util.get(newer, key);
     isCollection = !!(oldVal && oldVal.add);
     // except if:
     if(rels && rels[key]) {
-      idAttr = meta.get(rels[key].type, 'idAttribute') || 'id';
+      relType = rels[key].type;
+      idAttr = meta.get(relType, 'idAttribute') || 'id';
       if(typeof newVal != 'object' && util.get(oldVal, idAttr) == newVal) {
         // 1) the key is a rel and the old value is a instance of a model with the right id
         return;
-      } else if(Array.isArray(newVal) && isCollection) {
-        // 2) the key is a rel and the old value is a collection with the right ids (in any order)
-        return;
+      } else if(isCollection) {
+        if(Array.isArray(newVal)) {
+          // 2) the key is a rel and the old value is a collection with the right ids (in any order)
+          // convert the new value into an array of models
+          var models = newVal.map(function(item) {
+            if(item instanceof Model) {
+              return item;
+            }
+            var id = util.get(item, idAttr);
+            if(!flat[relType] || !flat[relType][id]) {
+              log.info('Cannot link', key, 'to', relType, id, 'items:', items);
+              return;
+            }
+            return flat[relType][id];
+          }).filter(Boolean);
+
+          oldVal.reset(models);
+          return;
+        } else if(!newVal) {
+          // for null / undefined, when a collection already exists, do nothing
+          return;
+        }
       }
     }
     // override the value
@@ -496,11 +523,11 @@ function override(name, old, newer) {
   }
 }
 
-module.exports = function(name, id, inputCache, cached, isRemote) {
+module.exports = function(name, id, inputCache, cached, flat) {
   // prefer the local cache instance
   var result = cached || inputCache;
 
-  log.info('Merging:', name, id, inputCache, cached, isRemote);
+  log.info('Merging:', name, id, inputCache, cached);
 
   // merge with inputcache (e.g. so that input ids will be hydrated)
   if(inputCache && cached) {
@@ -516,14 +543,14 @@ module.exports = function(name, id, inputCache, cached, isRemote) {
       // use the (global) cache result model as the return value
       // but apply the more recent updates from the ongoing hydration to it
       log.info('Merge override (onto, from) :', cached, inputCache);
-      override(name, cached, inputCache);
+      override(name, cached, inputCache, flat);
       result = cached;
 
       if (inputCache instanceof modelClass &&
           inputCache !== cached) {
         // disagreement: a second model instance has been created somewhere else,
         // update that other with the same values as in the result
-        override(name, inputCache, cached);
+        override(name, inputCache, cached, flat);
       }
     }
   }
