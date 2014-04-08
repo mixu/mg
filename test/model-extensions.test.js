@@ -131,6 +131,54 @@ exports['given two subscriptions to a model by id'] = {
     });
   },
 
+  'nested hydrate': function() {
+    // blog has post, post has comments
+    // hydrate blog w/post ->
+    // hydrate post w/ comments
+
+    var Blog = Backbone.Model.extend({
+      urlRoot: 'http://localhost:8721/blog/',
+      rels: {
+        post: {
+          type: 'Post'
+        }
+      }
+    });
+
+    mg.define('Blog', Blog);
+
+    var blog = new Blog({ id: 123 });
+
+    mg.hydrate('Blog', blog, {
+      name: 'Blog1',
+      post: {
+        __id: 2000,
+        name: 'Post2000',
+        comments: [ ]
+      }
+    });
+
+    var post = blog.get('post');
+
+    // post.unset('comments');
+
+    mg.hydrate('Post', post, {
+      __id: 2000,
+      name: 'Post2000-2',
+      comments: [
+        { id: 1, text: 'comment1' },
+      ]
+    });
+
+    // console.log(require('util').inspect(post, null, 20, true));
+
+    assert.ok(post instanceof Post);
+    assert.equal(post.get('name'), 'Post2000-2');
+    assert.ok(post.get('comments').at(0) instanceof Comment);
+    assert.equal(post.get('comments').at(0).id, 1);
+    assert.equal(post.get('comments').at(0).get('text'), 'comment1');
+  },
+
   'collection': {
 
     beforeEach: function() {
