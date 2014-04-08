@@ -131,7 +131,7 @@ exports['given two subscriptions to a model by id'] = {
     });
   },
 
-  'nested hydrate': function() {
+  'hydrating a collection twice, first empty, second array': function() {
     // blog has post, post has comments
     // hydrate blog w/post ->
     // hydrate post w/ comments
@@ -177,6 +177,59 @@ exports['given two subscriptions to a model by id'] = {
     assert.ok(post.get('comments').at(0) instanceof Comment);
     assert.equal(post.get('comments').at(0).id, 1);
     assert.equal(post.get('comments').at(0).get('text'), 'comment1');
+  },
+
+  'hydrating a collection twice, first array, second null': function() {
+    var post = new Post({ __id: 3000 });
+    mg.hydrate('Post', post, {
+      __id: 3000,
+      name: 'Post3000-1',
+      comments: [
+        { id: 2, text: 'comment2' },
+      ]
+    });
+    assert.ok(post instanceof Post);
+    assert.equal(post.get('name'), 'Post3000-1');
+    assert.equal(post.get('comments').length, 1);
+    assert.ok(post.get('comments').at(0) instanceof Comment);
+    assert.equal(post.get('comments').at(0).id, 2);
+    assert.equal(post.get('comments').at(0).get('text'), 'comment2');
+    mg.hydrate('Post', post, {
+      __id: 2000,
+      name: 'Post2000-4',
+      comments: null
+    });
+    assert.ok(post instanceof Post);
+    assert.equal(post.get('name'), 'Post2000-4');
+    assert.equal(post.get('comments').length, 1);
+    assert.ok(post.get('comments').at(0) instanceof Comment);
+    assert.equal(post.get('comments').at(0).id, 2);
+    assert.equal(post.get('comments').at(0).get('text'), 'comment2');
+  },
+
+  'hydrating a collection twice, first array, second empty array': function() {
+    var post = new Post({ __id: 4000 });
+    mg.hydrate('Post', post, {
+      __id: 4000,
+      name: 'Post4000-1',
+      comments: [
+        { id: 2, text: 'comment2' },
+      ]
+    });
+    assert.ok(post instanceof Post);
+    assert.equal(post.get('name'), 'Post4000-1');
+    assert.equal(post.get('comments').length, 1);
+    assert.ok(post.get('comments').at(0) instanceof Comment);
+    assert.equal(post.get('comments').at(0).id, 2);
+    assert.equal(post.get('comments').at(0).get('text'), 'comment2');
+    mg.hydrate('Post', post, {
+      __id: 4000,
+      name: 'Post4000-2',
+      comments: []
+    });
+    assert.ok(post instanceof Post);
+    assert.equal(post.get('name'), 'Post4000-2');
+    assert.equal(post.get('comments').length, 0);
   },
 
   'collection': {
