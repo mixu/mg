@@ -233,9 +233,9 @@ exports.model = function(name) {
 
 // get the collection class for the given name
 exports.collection = function(name) {
-  var collection = exports.get(name, 'collection');
+  var collection = exports.get(name, 'collectionType');
   if(!collection) {
-    console.log(name + ' does not have a `.collection` property.');
+    console.log(name + ' does not have a `.collectionType` property.');
     return Collection;
   }
   return exports.model(collection);
@@ -254,7 +254,7 @@ exports.define = function(name, mmeta) {
   // .url => used to determine the endpoint
   // .rels => hash of relations:
   //   'keyname': { type: 'Type' }
-  // .collection => name of collection class used (not instance to avoid circular deps)
+  // .collectionType => name of collection class used (not instance to avoid circular deps)
 
   // Assume we are given a Backbone model. All the interesting properties are on the prototype.
   meta[name] = mmeta.prototype;
