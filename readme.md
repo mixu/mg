@@ -9,6 +9,10 @@
 
 ## Getting started
 
+## Changelog
+
+`v1.1.x`: The `collection` property on models is now called `collectionType` to avoid collisions with the Backbone `collection` property. If you receive an error such as "A "url" property or function must be specified", you are probably missing the collectionType property and hence attempting to fetch a plain Backbone.Collection.
+
 ### Define model relations
 
 To set up `mg` hydration, define a `rels` property. For example, to have `Post.author` be hydrated as an instance of `Person`:
@@ -17,7 +21,7 @@ To set up `mg` hydration, define a `rels` property. For example, to have `Post.a
       url: function()  {
         return '/posts/' + this.id;
       },
-      collection: 'Posts', // <= collections of Post are created using the associated Collection (or Backbone.Collection by default)
+      collectionType: 'Posts', // <= collections of Post are created using the associated Collection (or Backbone.Collection by default)
       rels: {
         comment: { type: 'Comment' } // <= convert the comment field to a instance of Comment or a Collection of Comments
       }

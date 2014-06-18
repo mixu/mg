@@ -77,7 +77,7 @@ exports['given a simple model'] = {
     'when hydrating a collection of items and the collection is empty, do not create any models': function(done) {
       mg.define('CollectionTest', Backbone.Model.extend({
         url: 'http://localhost:8721/collectiontest/',
-        collection: 'CollectionTests'
+        collectionType: 'CollectionTests'
       }));
 
       mg.define('CollectionTests', Backbone.Collection.extend({

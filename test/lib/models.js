@@ -4,7 +4,7 @@ var Backbone = require('backbone'),
 var Post = Backbone.Model.extend({
   type: 'Post',
   urlRoot: 'http://localhost:8721/posts',
-  collection: 'Posts',
+  collectionType: 'Posts',
   idAttribute: '__id',
   rels: {
     'author': {
